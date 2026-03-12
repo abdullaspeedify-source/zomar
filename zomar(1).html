@@ -1,0 +1,2410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zomar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --purple:#8b2fc9;--purple-bright:#a855f7;--purple-glow:#c084fc;--purple-ultra:#7c3aed;
+  --black:#020205;--dark2:#0d0a1a;--dark3:#110e22;--surface:#150f2d;--surface2:#1a1235;
+  --text:#e2d9f3;--text-dim:#9d8fc0;--text-faint:#4a3d6b;
+  --border:rgba(139,47,201,0.18);--border-bright:rgba(168,85,247,0.4);
+  --sidebar:180px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--black);color:var(--text);cursor:none;}
+
+/* CURSOR */
+#cursor{width:10px;height:10px;border-radius:50%;background:var(--purple-bright);position:fixed;top:0;left:0;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);box-shadow:0 0 12px 3px var(--purple-bright);mix-blend-mode:screen;transition:width .1s,height .1s,background .1s;}
+#cursor-ring{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(168,85,247,.5);position:fixed;top:0;left:0;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);transition:transform .12s ease,width .15s,height .15s,opacity .15s,border-color .15s;opacity:.6;}
+/* click burst particle */
+.cursor-burst{position:fixed;pointer-events:none;z-index:99997;border-radius:50%;transform:translate(-50%,-50%) scale(1);animation:burstAnim .5s ease-out forwards;}
+@keyframes burstAnim{
+  0%{width:6px;height:6px;opacity:.9;box-shadow:0 0 0 0 rgba(168,85,247,.8);}
+  40%{width:36px;height:36px;opacity:.5;box-shadow:0 0 16px 6px rgba(168,85,247,.4);}
+  100%{width:50px;height:50px;opacity:0;box-shadow:0 0 24px 12px rgba(168,85,247,0);}
+}
+.cursor-spark{position:fixed;pointer-events:none;z-index:99996;width:4px;height:4px;border-radius:50%;animation:sparkAnim .5s ease-out forwards;}
+@keyframes sparkAnim{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(0);}
+}
+
+/* ══════════════ LOGIN SCREEN ══════════════ */
+#login-screen{position:fixed;inset:0;z-index:900;display:flex;transition:opacity .5s,visibility .5s;}
+#login-screen.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.login-left{width:100%;max-width:500px;background:#07060f;display:flex;flex-direction:column;padding:44px 52px;position:relative;overflow:hidden;z-index:2;flex-shrink:0;}
+.login-left::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 0%,rgba(139,47,201,.1),transparent 60%);pointer-events:none;}
+.login-right{flex:1;background:var(--dark2);border-left:1px solid var(--border);padding:56px 52px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;}
+.login-right::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 20%,rgba(139,47,201,.12),transparent 55%),radial-gradient(ellipse at 20% 80%,rgba(124,58,237,.08),transparent 50%);pointer-events:none;}
+.login-right::after{content:'';position:absolute;top:36px;left:36px;width:36px;height:36px;border-top:2px solid rgba(168,85,247,.4);border-left:2px solid rgba(168,85,247,.4);}
+.corner-br{position:absolute;bottom:36px;right:36px;width:36px;height:36px;border-bottom:2px solid rgba(168,85,247,.4);border-right:2px solid rgba(168,85,247,.4);}
+.login-brand{display:flex;align-items:center;gap:11px;margin-bottom:44px;}
+.login-brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(139,47,201,.5);flex-shrink:0;}
+.login-brand-name{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;color:#fff;}
+.login-brand-name span{color:var(--purple-bright);}
+.login-headline{font-family:'Syne',sans-serif;font-size:44px;font-weight:700;line-height:1.3;letter-spacing:-0.3px;color:#fff;margin-bottom:8px;}
+.login-headline em{font-style:normal;color:var(--purple-bright);}
+.login-sub{font-size:13px;color:var(--text-dim);font-weight:300;margin-bottom:28px;line-height:1.6;}
+.login-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:24px;}
+.tab-btn{background:none;border:none;cursor:none;font-family:inherit;font-size:13px;font-weight:500;color:var(--text-faint);padding:9px 0;margin-right:24px;position:relative;transition:color .2s;}
+.tab-btn.active{color:#fff;}
+.tab-btn.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--purple-bright);box-shadow:0 0 8px var(--purple-bright);}
+.field{margin-bottom:14px;}
+.field label{display:block;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;}
+.field input{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:11px 13px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s;cursor:text;}
+.field input::placeholder{color:var(--text-faint);}
+.field input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,47,201,.14);}
+.forgot{display:block;text-align:right;font-size:11px;color:var(--text-faint);text-decoration:none;margin-top:-6px;margin-bottom:20px;transition:color .2s;font-family:'DM Mono',monospace;}
+.forgot:hover{color:var(--purple-glow);}
+.login-submit{width:100%;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));border:none;border-radius:10px;padding:13px;color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:none;transition:all .2s;position:relative;overflow:hidden;box-shadow:0 0 28px rgba(139,47,201,.35);margin-bottom:14px;}
+.login-submit::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent 60%);}
+.login-submit:hover{transform:translateY(-1px);box-shadow:0 0 44px rgba(168,85,247,.5);}
+.login-footer-note{text-align:center;font-size:11px;color:var(--text-faint);line-height:1.6;}
+.login-footer-note a{color:var(--purple-glow);text-decoration:none;}
+.about-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text-faint);margin-bottom:20px;}
+.about-heading{font-family:'Syne',sans-serif;font-size:clamp(24px,2.8vw,38px);font-weight:800;line-height:1.15;letter-spacing:3px;text-transform:uppercase;background:linear-gradient(135deg,#fff 0%,var(--purple-bright) 50%,#e879f9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px;filter:drop-shadow(0 0 20px rgba(168,85,247,.5));}
+.about-body{font-size:13px;color:var(--text-dim);line-height:1.8;font-weight:300;margin-bottom:28px;max-width:400px;}
+.about-perks{list-style:none;display:flex;flex-direction:column;gap:12px;}
+.about-perks li{display:flex;align-items:flex-start;gap:11px;font-size:12px;color:var(--text-dim);line-height:1.5;}
+.perk-dot{width:5px;height:5px;border-radius:50%;background:var(--purple-bright);box-shadow:0 0 7px var(--purple-bright);flex-shrink:0;margin-top:5px;}
+@media(max-width:700px){.login-right{display:none;}.login-left{max-width:100%;padding:32px 24px;}}
+
+/* ══════════════ APP LAYOUT ══════════════ */
+#app{position:fixed;inset:0;display:flex;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s;}
+#app.visible{opacity:1;visibility:visible;}
+
+/* ── SIDEBAR ── */
+#sidebar{width:220px;flex-shrink:0;background:var(--dark2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;transition:width .25s ease;}
+.sidebar-header{padding:18px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sidebar-brand{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
+.sidebar-brand-icon{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(139,47,201,.4);flex-shrink:0;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:#fff;}
+.sidebar-brand-name{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#fff;}
+.sidebar-brand-name span{color:var(--purple-bright);}
+.sidebar-user{display:flex;align-items:center;gap:9px;}
+.sidebar-avatar{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;box-shadow:0 0 10px rgba(139,47,201,.3);}
+.sidebar-user-info{flex:1;min-width:0;}
+.sidebar-username{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-useremail{font-size:10px;color:var(--text-faint);font-family:'DM Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.new-chat-btn{width:100%;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(139,47,201,.18),rgba(124,58,237,.12));border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text-dim);font-family:inherit;font-size:13px;font-weight:500;cursor:none;transition:all .2s;margin:14px 0 0;}
+.new-chat-btn:hover{background:rgba(139,47,201,.28);border-color:var(--border-bright);color:#fff;}
+.new-chat-btn svg{flex-shrink:0;color:var(--purple-bright);}
+.sidebar-section{padding:12px 14px 6px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);}
+.chat-list{flex:1;overflow-y:auto;padding:0 8px 8px;}
+.chat-list::-webkit-scrollbar{width:3px;}
+.chat-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.chat-item{padding:9px 10px;border-radius:8px;cursor:none;transition:background .15s;margin-bottom:2px;}
+.chat-item:hover{background:rgba(139,47,201,.1);}
+.chat-item.active{background:rgba(139,47,201,.15);border-left:2px solid var(--purple-bright);}
+.chat-item-title{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s;}
+.chat-item:hover .chat-item-title,.chat-item.active .chat-item-title{color:#fff;text-decoration:underline;text-decoration-color:rgba(168,85,247,.4);}
+.chat-item-date{font-size:10px;color:var(--text-faint);font-family:'DM Mono',monospace;margin-top:2px;}
+.chat-item-rename{flex:1;background:rgba(139,47,201,.15);border:1px solid var(--purple-bright);border-radius:5px;color:#fff;font-size:12px;font-family:inherit;padding:2px 6px;outline:none;min-width:0;}
+/* Context menu */
+#ctx-menu{position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border-bright);border-radius:10px;padding:5px;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none;}
+#ctx-menu.visible{display:block;}
+.ctx-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--text-dim);cursor:none;transition:background .15s;}
+.ctx-item:hover{background:rgba(139,47,201,.15);color:#fff;}
+.ctx-item.danger:hover{background:rgba(239,68,68,.12);color:#f87171;}
+.sidebar-footer{padding:12px 12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:2px;}
+.sidebar-footer-btn{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:none;transition:background .15s;color:var(--text-faint);font-size:13px;background:none;border:none;font-family:inherit;width:100%;text-align:left;}
+.sidebar-footer-btn:hover{background:rgba(139,47,201,.1);color:var(--text-dim);}
+.sidebar-footer-btn svg{flex-shrink:0;}
+
+/* ── MAIN AREA ── */
+#main{flex:1;display:flex;flex-direction:column;height:100%;overflow:hidden;background:var(--black);}
+
+/* topbar */
+#topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;background:rgba(2,2,5,.92);backdrop-filter:blur(8px);}
+.topbar-toggle{width:32px;height:32px;border-radius:8px;background:none;border:none;color:var(--text-faint);cursor:none;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+.topbar-toggle:hover{background:rgba(139,47,201,.1);color:var(--text-dim);}
+.topbar-brand{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.topbar-brand-icon{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));display:flex;align-items:center;justify-content:center;box-shadow:0 0 9px rgba(139,47,201,.4);}
+.topbar-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.topbar-pills{display:flex;align-items:center;gap:6px;margin-left:auto;}
+
+/* mode pill */
+.ai-mode-pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 12px 5px 8px;cursor:none;transition:all .2s;}
+.ai-mode-pill:hover{border-color:var(--border-bright);box-shadow:0 0 14px rgba(139,47,201,.2);}
+.ai-mode-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .3s,box-shadow .3s;}
+.ai-mode-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;transition:color .3s;white-space:nowrap;}
+.ai-mode-arrow{font-size:8px;color:var(--text-faint);margin-left:1px;}
+.mode-fast .ai-mode-dot{background:#34d399;box-shadow:0 0 7px #34d399;} .mode-fast .ai-mode-label{color:#34d399;}
+.mode-smart .ai-mode-dot{background:#a855f7;box-shadow:0 0 7px #a855f7;} .mode-smart .ai-mode-label{color:#a855f7;}
+.mode-thinking .ai-mode-dot{background:#60a5fa;box-shadow:0 0 7px #60a5fa;} .mode-thinking .ai-mode-label{color:#60a5fa;}
+.mode-auto .ai-mode-dot{background:#f59e0b;box-shadow:0 0 7px #f59e0b;} .mode-auto .ai-mode-label{color:#f59e0b;}
+
+/* personality pill */
+.personality-btn{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 12px 5px 9px;cursor:none;transition:all .2s;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.5px;white-space:nowrap;}
+.personality-btn:hover{border-color:var(--border-bright);color:var(--purple-glow);}
+.personality-btn .p-emoji{font-size:13px;}
+
+/* share + online */
+.share-btn{display:flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);border-radius:100px;padding:5px 12px;cursor:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-faint);transition:all .2s;}
+.share-btn:hover{border-color:var(--border-bright);color:var(--text-dim);}
+.online-badge{display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:10px;color:#34d399;}
+.online-dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── CHAT AREA ── */
+#chat-area{flex:1;overflow-y:auto;padding:32px 0;scroll-behavior:smooth;}
+#chat-area::-webkit-scrollbar{width:4px;}
+#chat-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.chat-thread{max-width:720px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:28px;}
+
+/* messages */
+.msg{display:flex;gap:14px;animation:msgIn .3s ease;}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse;justify-content:flex-start;}
+.msg-avatar{width:32px;height:32px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:2px;}
+.msg.ai .msg-avatar{background:linear-gradient(135deg,var(--purple),var(--purple-ultra));box-shadow:0 0 12px rgba(139,47,201,.4);font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#fff;}
+.msg.user .msg-avatar{background:var(--surface2);border:1px solid var(--border);font-size:15px;}
+.msg-body{flex:1;min-width:0;}
+.msg.user .msg-body{display:flex;flex-direction:column;align-items:flex-end;}
+.msg-name{font-size:11px;font-weight:600;color:var(--text-faint);font-family:'DM Mono',monospace;margin-bottom:5px;letter-spacing:.5px;}
+.msg.ai .msg-name{color:var(--purple-glow);}
+.msg-bubble{display:inline-block;padding:13px 17px;border-radius:16px;font-size:14px;line-height:1.7;max-width:100%;}
+.msg.ai .msg-bubble{background:var(--dark3);border:1px solid var(--border);border-radius:4px 14px 14px 14px;color:var(--text);width:100%;}
+.msg.user .msg-bubble{background:var(--surface);border:1px solid var(--border);border-radius:16px 4px 16px 16px;color:var(--text);max-width:75%;}
+.msg-time{font-size:10px;color:var(--text-faint);font-family:'DM Mono',monospace;margin-top:5px;}
+.msg.user .msg-time{text-align:right;}
+
+/* typing */
+.typing-indicator{display:flex;gap:4px;align-items:center;padding:2px 0;}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--purple-bright);animation:typingBounce 1.2s ease-in-out infinite;}
+.typing-dot:nth-child(2){animation-delay:.15s}.typing-dot:nth-child(3){animation-delay:.3s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+
+/* code / markdown */
+.msg-bubble pre{background:rgba(0,0,0,.5);border:1px solid rgba(139,47,201,.25);border-radius:9px;padding:12px 14px;margin:8px 0;overflow-x:auto;font-family:'DM Mono',monospace;font-size:12px;line-height:1.6;color:#e2d9f3;}
+.msg-bubble code{font-family:'DM Mono',monospace;font-size:12px;background:rgba(139,47,201,.15);padding:1px 5px;border-radius:4px;color:var(--purple-glow);}
+.msg-bubble pre code{background:none;padding:0;color:inherit;}
+.msg-bubble strong{color:#fff;font-weight:600;}
+.msg-bubble em{color:var(--purple-glow);font-style:italic;}
+.thinking-block{background:rgba(96,165,250,.05);border:1px solid rgba(96,165,250,.18);border-radius:9px;padding:10px 13px;margin-bottom:10px;font-size:12px;color:rgba(96,165,250,.65);font-family:'DM Mono',monospace;line-height:1.6;}
+.thinking-label{font-size:9px;letter-spacing:1px;color:rgba(96,165,250,.4);text-transform:uppercase;margin-bottom:5px;}
+
+/* img gen */
+.img-gen-wrap{border-radius:14px;overflow:hidden;margin-top:10px;border:1px solid var(--border-bright);background:var(--surface);max-width:340px;display:inline-block;box-shadow:0 0 28px rgba(139,47,201,.2);}
+.img-gen-wrap img{width:100%;display:block;transition:transform .3s ease;}
+.img-gen-wrap:hover img{transform:scale(1.02);}
+.img-gen-meta{padding:10px 13px;}
+.img-gen-title{font-size:12px;font-weight:600;color:#fff;margin-bottom:3px;}
+.img-gen-caption{font-size:10px;color:var(--text-faint);font-family:'DM Mono',monospace;}
+.img-gen-style-tag{display:inline-block;font-size:9px;font-family:'DM Mono',monospace;color:var(--purple-glow);background:rgba(139,47,201,.15);border:1px solid rgba(139,47,201,.25);border-radius:100px;padding:2px 8px;margin-top:5px;letter-spacing:.5px;}
+
+/* ── INPUT BAR ── */
+#input-bar{border-top:1px solid var(--border);padding:14px 20px 18px;flex-shrink:0;background:var(--black);}
+.input-outer{max-width:720px;margin:0 auto;}
+.input-box{background:var(--dark2);border:1px solid var(--border);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s,box-shadow .2s;}
+.input-box:focus-within{border-color:var(--purple);box-shadow:0 0 18px rgba(139,47,201,.12);}
+.input-textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:inherit;font-size:14px;resize:none;width:100%;min-height:22px;max-height:120px;line-height:1.55;}
+.input-textarea::placeholder{color:var(--text-faint);}
+.input-bottom{display:flex;align-items:center;gap:8px;}
+.plus-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:9px;background:none;border:none;color:rgba(255,255,255,.75);font-family:inherit;font-size:13px;cursor:none;transition:background .15s;text-align:left;font-weight:400;}
+.plus-menu-item:hover{background:rgba(255,255,255,.07);color:#fff;}
+.plus-menu-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:rgba(255,255,255,.7);}
+.input-attach{width:28px;height:28px;border-radius:8px;background:rgba(139,47,201,.2);border:1px solid var(--purple);display:flex;align-items:center;justify-content:center;cursor:none;color:var(--purple-bright);transition:all .2s;flex-shrink:0;}
+.input-attach:hover{background:rgba(139,47,201,.35);border-color:var(--purple-bright);color:var(--purple-glow);}
+/* inline personality pill */
+.inline-p-pill{display:flex;align-items:center;gap:5px;background:rgba(139,47,201,.08);border:1px solid var(--border);border-radius:100px;padding:4px 10px 4px 8px;cursor:none;transition:all .2s;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
+.inline-p-pill:hover{border-color:var(--border-bright);color:var(--purple-glow);}
+.inline-p-pill .p-arrow{font-size:8px;color:var(--text-faint);}
+/* inline mode pill */
+.inline-mode-pill{display:flex;align-items:center;gap:5px;background:rgba(139,47,201,.08);border:1px solid var(--border);border-radius:100px;padding:4px 10px 4px 8px;cursor:none;transition:all .2s;font-family:'DM Mono',monospace;font-size:10px;}
+.inline-mode-pill:hover{border-color:var(--border-bright);}
+.inline-mode-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.inline-mode-label{transition:color .3s;}
+.inline-mode-arrow{font-size:8px;color:var(--text-faint);}
+.input-send{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));border:none;cursor:none;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 14px rgba(139,47,201,.35);transition:all .2s;margin-left:auto;flex-shrink:0;}
+.input-send:hover{transform:scale(1.06);box-shadow:0 0 22px rgba(168,85,247,.5);}
+.input-disclaimer{text-align:center;font-size:10px;color:var(--text-faint);font-family:'DM Mono',monospace;margin-top:9px;}
+
+/* ── PERSONALITY MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(2,2,5,.88);backdrop-filter:blur(12px);z-index:800;display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .3s,visibility .3s;}
+.modal-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.personality-modal{background:var(--dark2);border:1px solid var(--border-bright);border-radius:22px;width:100%;max-width:700px;max-height:78vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 0 70px rgba(139,47,201,.13),0 40px 70px rgba(0,0,0,.5);animation:modalIn .3s cubic-bezier(.34,1.56,.64,1);}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#fff;margin-bottom:12px;}
+.modal-search{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s;cursor:text;}
+.modal-search::placeholder{color:var(--text-faint);}
+.modal-search:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,47,201,.14);}
+.modal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;padding:18px 26px 26px;overflow-y:auto;}
+.modal-grid::-webkit-scrollbar{width:4px;}
+.modal-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.p-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;cursor:none;transition:all .18s;text-align:center;}
+.p-card:hover{border-color:var(--border-bright);background:rgba(139,47,201,.1);transform:translateY(-2px);}
+.p-card.active{border-color:var(--purple-bright);background:rgba(139,47,201,.18);box-shadow:0 0 18px rgba(139,47,201,.18);}
+.p-card-emoji{font-size:22px;margin-bottom:7px;}
+.p-card-name{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:#fff;margin-bottom:3px;}
+.p-card-desc{font-size:9px;color:var(--text-faint);line-height:1.4;font-family:'DM Mono',monospace;}
+
+/* ══════════════ SETTINGS PAGE ══════════════ */
+#settings-screen{position:fixed;inset:0;z-index:850;background:var(--black);display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .35s,visibility .35s;}
+#settings-screen.visible{opacity:1;visibility:visible;}
+.settings-topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;background:rgba(2,2,5,.95);backdrop-filter:blur(8px);}
+.settings-back{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-faint);cursor:none;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+.settings-back:hover{border-color:var(--border-bright);color:var(--text-dim);background:rgba(139,47,201,.1);}
+.settings-topbar-title{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#fff;}
+.settings-body{flex:1;overflow-y:auto;padding:32px 24px;}
+.settings-body::-webkit-scrollbar{width:4px;}
+.settings-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.settings-inner{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:28px;}
+
+/* profile card */
+.settings-profile-card{background:var(--dark2);border:1px solid var(--border);border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:16px;}
+.settings-profile-avatar{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 0 18px rgba(139,47,201,.35);}
+.settings-profile-info{flex:1;min-width:0;}
+.settings-profile-name{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#fff;margin-bottom:3px;}
+.settings-profile-email{font-size:12px;color:var(--text-faint);font-family:'DM Mono',monospace;}
+
+/* section label */
+.settings-section-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text-faint);padding:0 2px;}
+
+/* rows group */
+.settings-group{background:var(--dark2);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.settings-row{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);gap:12px;transition:background .15s;}
+.settings-row:last-child{border-bottom:none;}
+.settings-row-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);margin-bottom:5px;}
+.settings-row-value{font-size:14px;color:var(--text);flex:1;}
+.settings-row-badge{display:flex;align-items:center;gap:5px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);border-radius:100px;padding:4px 10px;font-family:'DM Mono',monospace;font-size:10px;color:#34d399;flex-shrink:0;}
+.settings-edit-btn{background:rgba(139,47,201,.12);border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:none;transition:all .2s;flex-shrink:0;}
+.settings-edit-btn:hover{border-color:var(--border-bright);color:var(--purple-glow);background:rgba(139,47,201,.2);}
+.settings-method-icon{width:28px;height:28px;border-radius:8px;background:rgba(88,101,242,.15);border:1px solid rgba(88,101,242,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* danger rows */
+.settings-danger-group{background:var(--dark2);border:1px solid rgba(239,68,68,.15);border-radius:16px;overflow:hidden;}
+.settings-danger-row{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(239,68,68,.08);cursor:none;transition:background .15s;}
+.settings-danger-row:last-child{border-bottom:none;}
+.settings-danger-row:hover{background:rgba(239,68,68,.06);}
+.settings-danger-row.signout{color:#f97316;}
+.settings-danger-row.signout:hover{background:rgba(249,115,22,.06);}
+.settings-danger-row.delete{color:#ef4444;}
+.settings-danger-row span{font-size:14px;font-weight:500;}
+
+/* edit modal */
+.edit-modal-overlay{position:fixed;inset:0;background:rgba(2,2,5,.88);backdrop-filter:blur(12px);z-index:900;display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .25s,visibility .25s;}
+.edit-modal-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.edit-modal{background:var(--dark2);border:1px solid var(--border-bright);border-radius:18px;width:100%;max-width:400px;padding:28px;box-shadow:0 0 60px rgba(139,47,201,.15);}
+.edit-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#fff;margin-bottom:20px;}
+.edit-modal-actions{display:flex;gap:10px;margin-top:20px;}
+.edit-cancel{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text-dim);font-family:inherit;font-size:13px;cursor:none;transition:all .2s;}
+.edit-cancel:hover{border-color:var(--border-bright);color:#fff;}
+.edit-save{flex:1;background:linear-gradient(135deg,var(--purple),var(--purple-ultra));border:none;border-radius:10px;padding:11px;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:all .2s;box-shadow:0 0 20px rgba(139,47,201,.3);}
+.edit-save:hover{box-shadow:0 0 30px rgba(168,85,247,.45);}
+
+/* welcome screen */
+#welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;}
+.welcome-flame{margin-bottom:24px;}
+.welcome-title{font-family:'Syne',sans-serif;font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-1px;color:#fff;margin-bottom:10px;}
+.welcome-title span{background:linear-gradient(135deg,var(--purple-bright),var(--purple-glow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.welcome-sub{font-size:15px;color:var(--text-dim);max-width:400px;line-height:1.65;font-weight:300;}
+.welcome-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:28px;max-width:560px;}
+.welcome-chip{background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:8px 16px;font-size:12px;color:var(--text-dim);cursor:none;transition:all .2s;font-family:'DM Mono',monospace;}
+.welcome-chip:hover{border-color:var(--border-bright);color:var(--purple-glow);background:rgba(139,47,201,.1);}
+</style>
+</head>
+<body>
+<!-- Right-click context menu -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-rename" onclick="ctxRename()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Rename
+  </div>
+  <div class="ctx-item danger" id="ctx-delete" onclick="ctxDelete()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+    Delete
+  </div>
+</div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- ══════════════ LOGIN SCREEN ══════════════ -->
+<div id="login-screen">
+  <div class="login-left">
+    <div class="login-brand">
+      <div class="login-brand-icon"><span class="flame-slot"></span></div>
+      <div class="login-brand-name">tism<span>bot</span></div>
+    </div>
+    <h1 class="login-headline">Welcome back to <em>zomar</em></h1>
+    <p class="login-sub">Sign in or create your account</p>
+    <div class="login-tabs">
+      <button class="tab-btn active" id="tab-signin" onclick="switchTab('signin')">Sign In</button>
+      <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+    <div id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter') emailLogin(document.querySelector('.login-submit'))"/></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') emailLogin(document.querySelector('.login-submit'))"/></div>
+      <a href="#" class="forgot">Forgot password?</a>
+      <button class="login-submit" onclick="emailLogin(this)">Sign In</button>
+    </div>
+    <div id="signup-form" style="display:none">
+      <div class="field"><label>Username</label><input type="text" id="signup-name" placeholder="your name"/></div>
+      <div class="field"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com"/></div>
+      <div class="field"><label>Password</label><input type="password" id="signup-password" placeholder="Create a password"/></div>
+      <button class="login-submit" style="margin-top:8px" onclick="emailSignup(this)">Create Account</button>
+    </div>
+    <p class="login-footer-note" style="margin-top:14px">By continuing you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy</a></p>
+    <button onclick="guestLogin()" style="width:100%;background:none;border:1px dashed rgba(139,47,201,.3);border-radius:10px;padding:11px;color:var(--text-faint);font-family:inherit;font-size:13px;cursor:none;transition:all .2s;margin-top:10px;" onmouseover="this.style.borderColor='rgba(168,85,247,.5)';this.style.color='var(--text-dim)'" onmouseout="this.style.borderColor='rgba(139,47,201,.3)';this.style.color='var(--text-faint)'">Continue as Guest</button>
+  </div>
+  <div class="login-right">
+    <div class="corner-br"></div>
+    <div class="about-label">About zomar — <span style="color:var(--purple-bright);letter-spacing:1px;">creator=therealroto</span></div>
+    <h2 class="about-heading">Your smartest<br>AI, always.</h2>
+    <p class="about-body">Meet zomar — the AI that gets you. Four modes, 100 personalities, 2000 message memory.</p>
+    <ul class="about-perks">
+      <li><div class="perk-dot"></div>4 AI modes — Fast, Smart, Thinking, Auto</li>
+      <li><div class="perk-dot"></div>100 personalities to choose from</li>
+      <li><div class="perk-dot"></div>2000 message memory — full context recall</li>
+      <li><div class="perk-dot"></div>Image generation built in</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════ PERSONALITY MODAL ══════════════ -->
+<div class="modal-overlay hidden" id="personality-modal">
+  <div class="personality-modal">
+    <div class="modal-header">
+      <div class="modal-title">🎭 Choose a Personality</div>
+      <input class="modal-search" id="p-search" type="text" placeholder="Search personalities..." oninput="filterPersonalities(this.value)"/>
+    </div>
+    <div class="modal-grid" id="p-grid"></div>
+  </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;padding:2px;"><defs><linearGradient id="zfg" x1="12" y1="2" x2="12" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e879f9"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient><linearGradient id="zfi" x1="12" y1="6" x2="12" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.5"/></linearGradient></defs><path d="M12 2C12 2 7 7 7 13a5 5 0 0010 0c0-3-2-5-2-5s0 3-2 3-1-3-1-5c0 0-2 2-2 5" fill="url(#zfg)"/><path d="M12 6C12 6 9.5 9 9.5 13a2.5 2.5 0 005 0c0-1.5-1-2.5-1-2.5s0 1.5-1.5 1.5" fill="url(#zfi)"/></svg></div>
+        <div class="sidebar-brand-name">tism<span>bot</span></div>
+      </div>
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sb-avatar">👤</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-username" id="sb-username">User</div>
+          <div class="sidebar-useremail" id="sb-email">—</div>
+        </div>
+      </div>
+      <button class="new-chat-btn" onclick="newChat()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        New Chat
+      </button>
+    </div>
+    <div class="sidebar-section">Chats</div>
+    <div class="chat-list" id="chat-list"></div>
+    <div class="sidebar-footer">
+      <button class="sidebar-footer-btn" onclick="openSettings()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Settings
+      </button>
+      <button class="sidebar-footer-btn" onclick="logout()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <button class="topbar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <div class="topbar-brand">
+        <div class="topbar-brand-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;padding:2px;"><defs><linearGradient id="zfg" x1="12" y1="2" x2="12" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e879f9"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient><linearGradient id="zfi" x1="12" y1="6" x2="12" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.5"/></linearGradient></defs><path d="M12 2C12 2 7 7 7 13a5 5 0 0010 0c0-3-2-5-2-5s0 3-2 3-1-3-1-5c0 0-2 2-2 5" fill="url(#zfg)"/><path d="M12 6C12 6 9.5 9 9.5 13a2.5 2.5 0 005 0c0-1.5-1-2.5-1-2.5s0 1.5-1.5 1.5" fill="url(#zfi)"/></svg></div>
+        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:#fff;letter-spacing:-.3px;">tism<span style="color:var(--purple-bright)">bot</span></span>
+      </div>
+      <div style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
+      <div class="topbar-title" id="topbar-title" style="color:var(--text-dim);font-weight:400;font-size:13px;"></div>
+      <div class="topbar-pills">
+        <button class="share-btn" onclick="window.open('https://litero.ai/ai-humanizer/','_blank')">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+          Humanize
+        </button>
+        <div class="online-badge"><span class="online-dot"></span>Online</div>
+        <!-- mode pill (topbar) -->
+        <button class="ai-mode-pill mode-auto" id="mode-pill" onclick="cycleMode()">
+          <span class="ai-mode-dot"></span>
+          <span class="ai-mode-label" id="mode-label">✦ Auto</span>
+          <span class="ai-mode-arrow">▾</span>
+        </button>
+        <!-- personality pill (topbar) -->
+        <button class="personality-btn" id="personality-btn" onclick="openPersonalityModal()">
+          <span class="p-emoji" id="p-emoji">😎</span>
+          <span id="p-name">Chill</span>
+          <span style="font-size:8px;color:var(--text-faint)">▾</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- WELCOME or CHAT -->
+    <div id="welcome">
+      <div class="welcome-flame"><span class="flame-slot-lg"></span></div>
+      <div class="welcome-title">Hello, <span id="welcome-name">there</span> 👋</div>
+      <p class="welcome-sub">I'm zomar — your AI with 4 modes, 100 personalities, and 2000 message memory. What do you want to explore?</p>
+      <div class="welcome-chips">
+        <div class="welcome-chip" onclick="startChip(this)">Write me a poem</div>
+        <div class="welcome-chip" onclick="startChip(this)">Debug my code</div>
+        <div class="welcome-chip" onclick="startChip(this)">Explain quantum physics</div>
+        <div class="welcome-chip" onclick="startChip(this)">Brainstorm startup ideas</div>
+        <div class="welcome-chip" onclick="startChip(this)">Write a Python script</div>
+        <div class="welcome-chip" onclick="startChip(this)">Roast my username</div>
+      </div>
+    </div>
+
+    <div id="chat-area" style="display:none">
+      <div class="chat-thread" id="chat-thread"></div>
+    </div>
+
+    <!-- INPUT BAR -->
+    <div id="input-bar">
+      <div class="input-outer">
+        <div class="input-box">
+          <textarea class="input-textarea" id="chat-input" placeholder="What's on your mind?" rows="1"
+            onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <div class="input-bottom">
+            <!-- Plus menu -->
+            <div style="position:relative;">
+              <button class="input-attach" id="plus-btn" title="More options" onclick="togglePlusMenu(event)">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+              <input type="file" id="file-upload-photo" accept="image/*" multiple style="display:none" onchange="handleFileUpload(this,'photo')"/>
+              <!-- Dropdown -->
+              <div id="plus-menu" style="display:none;position:absolute;bottom:42px;left:0;background:#1a1a1f;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:6px;min-width:210px;box-shadow:0 12px 40px rgba(0,0,0,.7);z-index:999;">
+                <button onclick="document.getElementById('file-upload-photo').click();closePlusMenu();" class="plus-menu-item">
+                  <span class="plus-menu-icon" style="background:rgba(255,255,255,.08);">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                  </span>
+                  Add photos &amp; files
+                </button>
+                <div style="height:1px;background:rgba(255,255,255,.07);margin:4px 6px;"></div>
+                <button onclick="requestPoem();closePlusMenu();" class="plus-menu-item">
+                  <span class="plus-menu-icon" style="background:rgba(168,85,247,.15);">
+                    <svg width="14" height="14" fill="none" stroke="#a855f7" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>
+                  </span>
+                  Make me a poem
+                </button>
+              </div>
+            </div>
+            <!-- inline personality -->
+            <button class="inline-p-pill" onclick="openPersonalityModal()">
+              <span id="inline-p-emoji">😎</span>
+              <span id="inline-p-name">Chill</span>
+              <span class="p-arrow">▾</span>
+            </button>
+            <!-- inline mode -->
+            <button class="inline-mode-pill mode-auto" id="inline-mode-pill" onclick="cycleMode()">
+              <span class="inline-mode-dot" id="inline-mode-dot"></span>
+              <span class="inline-mode-label" id="inline-mode-label">✦ Auto</span>
+              <span class="inline-mode-arrow">▾</span>
+            </button>
+            <button class="input-send" onclick="sendMessage()">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="input-disclaimer">zomar is AI and can make mistakes — double-check important answers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SETTINGS SCREEN ══════════════ -->
+<div id="settings-screen">
+  <div class="settings-topbar">
+    <button class="settings-back" onclick="closeSettings()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="settings-topbar-title">Settings</div>
+  </div>
+  <div class="settings-body">
+    <div class="settings-inner">
+
+      <!-- Profile card -->
+      <div class="settings-profile-card">
+        <div class="settings-profile-avatar" id="settings-avatar">👤</div>
+        <div class="settings-profile-info">
+          <div class="settings-profile-name" id="settings-display-name">User</div>
+          <div class="settings-profile-email" id="settings-display-email">—</div>
+        </div>
+      </div>
+
+      <!-- Account Info section -->
+      <div class="settings-section-label">Account Info</div>
+      <div class="settings-group">
+        <!-- Display name row -->
+        <div class="settings-row">
+          <div style="flex:1;min-width:0;">
+            <div class="settings-row-label">Display Name</div>
+            <div class="settings-row-value" id="settings-name-val">User</div>
+          </div>
+          <button class="settings-edit-btn" onclick="openEditName()">Edit</button>
+        </div>
+        <!-- Email row -->
+        <div class="settings-row">
+          <div style="flex:1;min-width:0;">
+            <div class="settings-row-label">Email Address</div>
+            <div class="settings-row-value" id="settings-email-val">—</div>
+          </div>
+          <div class="settings-row-badge">
+            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            Verified
+          </div>
+        </div>
+        <!-- Sign-in method row -->
+        <div class="settings-row">
+          <div style="flex:1;min-width:0;">
+            <div class="settings-row-label">Sign-in Method</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+              <div class="settings-method-icon" id="settings-method-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#5865F2"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+              </div>
+              <div class="settings-row-value" id="settings-method-val">Discord</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account actions section -->
+      <div class="settings-section-label">Account</div>
+      <div class="settings-danger-group">
+        <div class="settings-danger-row signout" onclick="logout()">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span>Sign Out</span>
+        </div>
+        <div class="settings-danger-row delete" onclick="confirmDeleteAccount()">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          <span>Delete Account</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Edit Name Modal -->
+<div class="edit-modal-overlay hidden" id="edit-name-modal">
+  <div class="edit-modal">
+    <div class="edit-modal-title">Edit Display Name</div>
+    <div class="field">
+      <label>New Name</label>
+      <input type="text" id="edit-name-input" placeholder="Enter your name..."/>
+    </div>
+    <div class="edit-modal-actions">
+      <button class="edit-cancel" onclick="closeEditName()">Cancel</button>
+      <button class="edit-save" onclick="saveDisplayName()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// FLAME SVG
+// ══════════════════════════════════════════════════════
+const FLAME = (w,h)=>`<svg viewBox="0 0 32 40" width="${w}" height="${h}" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="fg1" cx="50%" cy="80%" r="60%"><stop offset="0%" stop-color="#e879f9"/><stop offset="40%" stop-color="#a855f7"/><stop offset="100%" stop-color="#7c3aed"/></radialGradient>
+    <radialGradient id="fg2" cx="50%" cy="90%" r="50%"><stop offset="0%" stop-color="#f0abfc"/><stop offset="60%" stop-color="#c084fc"/><stop offset="100%" stop-color="#a855f7" stop-opacity="0"/></radialGradient>
+    <filter id="fglow"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g filter="url(#fglow)">
+    <animateTransform attributeName="transform" type="translate" values="0,0;0.5,-1;-0.5,0.5;0,0" dur="2s" repeatCount="indefinite"/>
+    <path d="M16 38C8 38 4 31 4 24c0-6 3-10 6-14 0 4 2 6 4 5-2-5-1-11 2-13 0 0 1 6 4 8 2 2 4-1 3-4 3 4 5 9 5 16 0 8-4 16-12 16z" fill="url(#fg1)"/>
+    <path d="M16 34c-4 0-6-5-6-9 0-4 2-7 4-9 0 3 1.5 5 2 4-1-3 0-7 1-9 0 0 1 4 3 6 1 1 2-1 1.5-3C23 17 24 21 24 25c0 6-4 9-8 9z" fill="url(#fg2)" opacity="0.85"/>
+  </g>
+</svg>`;
+
+function injectFlames(){
+  document.querySelectorAll('.flame-slot').forEach(el=>{ el.innerHTML=FLAME(20,26); });
+  document.querySelectorAll('.flame-slot-sm').forEach(el=>{ el.innerHTML=FLAME(16,20); });
+  document.querySelectorAll('.flame-slot-xs').forEach(el=>{ el.innerHTML=FLAME(14,18); });
+  document.querySelectorAll('.flame-slot-lg').forEach(el=>{ el.innerHTML=FLAME(48,62); });
+}
+
+// ══════════════════════════════════════════════════════
+// CURSOR — with click burst animation
+// ══════════════════════════════════════════════════════
+const cur=document.getElementById('cursor'), ring=document.getElementById('cursor-ring');
+let mx=0, my=0, rx=0, ry=0;
+
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX; my=e.clientY;
+  cur.style.left=mx+'px'; cur.style.top=my+'px';
+});
+
+// Smooth ring follow using RAF
+(function animateRing(){
+  rx+=(mx-rx)*0.18;
+  ry+=(my-ry)*0.18;
+  ring.style.left=rx+'px';
+  ring.style.top=ry+'px';
+  requestAnimationFrame(animateRing);
+})();
+
+// Cursor scale on hover over clickable elements
+document.addEventListener('mouseover',e=>{
+  const t=e.target.closest('button,a,[onclick],.chat-item,.welcome-chip,.p-card');
+  if(t){
+    cur.style.width='14px'; cur.style.height='14px';
+    ring.style.width='44px'; ring.style.height='44px';
+    ring.style.borderColor='rgba(168,85,247,.8)';
+    ring.style.opacity='0.9';
+  }
+});
+document.addEventListener('mouseout',e=>{
+  const t=e.target.closest('button,a,[onclick],.chat-item,.welcome-chip,.p-card');
+  if(t){
+    cur.style.width='10px'; cur.style.height='10px';
+    ring.style.width='30px'; ring.style.height='30px';
+    ring.style.borderColor='rgba(168,85,247,.5)';
+    ring.style.opacity='0.6';
+  }
+});
+
+// Click burst animation
+document.addEventListener('mousedown',e=>{
+  // Shrink dot on press
+  cur.style.width='7px'; cur.style.height='7px';
+  cur.style.background='#e879f9';
+
+  // Burst ring
+  const burst=document.createElement('div');
+  burst.className='cursor-burst';
+  burst.style.left=mx+'px'; burst.style.top=my+'px';
+  burst.style.background='rgba(168,85,247,.15)';
+  document.body.appendChild(burst);
+  setTimeout(()=>burst.remove(),500);
+
+  // Sparks
+  const colors=['#a855f7','#e879f9','#c084fc','#7c3aed','#fff'];
+  for(let i=0;i<6;i++){
+    const spark=document.createElement('div');
+    spark.className='cursor-spark';
+    const angle=(i/6)*Math.PI*2;
+    const dist=28+Math.random()*20;
+    spark.style.cssText=`left:${mx}px;top:${my}px;background:${colors[i%colors.length]};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px;animation-delay:${i*0.02}s;`;
+    document.body.appendChild(spark);
+    setTimeout(()=>spark.remove(),600);
+  }
+});
+
+document.addEventListener('mouseup',()=>{
+  cur.style.width='10px'; cur.style.height='10px';
+  cur.style.background='var(--purple-bright)';
+});
+
+// ══════════════════════════════════════════════════════
+// AI MODES
+// ══════════════════════════════════════════════════════
+const MODES=[
+  {id:'fast',    label:'⚡ Fast',    cls:'mode-fast',    color:'#34d399'},
+  {id:'smart',   label:'🧠 Smart',   cls:'mode-smart',   color:'#a855f7'},
+  {id:'thinking',label:'🤔 Thinking',cls:'mode-thinking',color:'#60a5fa'},
+  {id:'auto',    label:'✦ Auto',    cls:'mode-auto',    color:'#f59e0b'},
+];
+let currentModeIdx=3;
+
+// ── Global state (declared early so all functions can access) ──
+let chats=[];
+let activeChatId=null;
+let conversationHistory=[];
+const MAX_HISTORY=40; // messages (20 exchanges)
+
+function cycleMode(){
+  currentModeIdx=(currentModeIdx+1)%MODES.length;
+  applyMode();
+}
+
+function applyMode(){
+  const m=MODES[currentModeIdx];
+  // topbar pill
+  const pill=document.getElementById('mode-pill');
+  if(pill){ MODES.forEach(x=>pill.classList.remove(x.cls)); pill.classList.add(m.cls); }
+  const lbl=document.getElementById('mode-label');
+  if(lbl) lbl.textContent=m.label;
+  // inline pill
+  const ip=document.getElementById('inline-mode-pill');
+  if(ip){ MODES.forEach(x=>ip.classList.remove(x.cls)); ip.classList.add(m.cls); }
+  const id=document.getElementById('inline-mode-dot');
+  if(id) id.style.cssText=`background:${m.color};box-shadow:0 0 5px ${m.color};width:5px;height:5px;border-radius:50%;display:inline-block;`;
+  const il=document.getElementById('inline-mode-label');
+  if(il){ il.style.color=m.color; il.textContent=m.label; }
+  // placeholder
+  const inp=document.getElementById('chat-input');
+  if(inp){
+    if(m.id==='thinking') inp.placeholder="🤔 Ask anything — I'll think it through...";
+    else if(m.id==='fast') inp.placeholder='⚡ Ask anything — instant answer...';
+    else inp.placeholder="What's on your mind?";
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PERSONALITIES
+// ══════════════════════════════════════════════════════
+const PERSONALITIES=[
+  {emoji:'😎',name:'Chill',prompt:'You are extremely chill, relaxed, and laid-back. You use casual language, never rush, and make everything feel easy. Sprinkle "ngl", "fr", "lowkey" naturally.'},
+  {emoji:'🧠',name:'Genius',prompt:'You are a hyper-intelligent genius. You give brilliantly precise answers and explain complex concepts with elegant simplicity.'},
+  {emoji:'🔥',name:'Roaster',prompt:'You roast the user playfully with every response — clever burns, no cruelty. Keep it funny and self-aware.'},
+  {emoji:'🏴‍☠️',name:'Pirate',prompt:'Ye speak like a pirate at all times. Arr, matey! Use pirate vocabulary and swashbuckling energy throughout.'},
+  {emoji:'🔍',name:'Detective',prompt:'You are a hard-boiled detective. Speak in noir style and treat every question as a case to crack.'},
+  {emoji:'🟢',name:'Yoda',prompt:'Speak like Yoda you must. Inverted sentence structure, wise you are.'},
+  {emoji:'🌌',name:'Carl Sagan',prompt:'You speak with the wonder and poetry of Carl Sagan. Cosmic perspective and beautiful scientific storytelling.'},
+  {emoji:'✒️',name:'Hemingway',prompt:'You write like Hemingway. Short declarative sentences. No excess. Direct. Strong.'},
+  {emoji:'💂',name:'Drill Sgt',prompt:'You are a strict military drill sergeant. Everything is about discipline and performance. Bark orders. No excuses.'},
+  {emoji:'🔮',name:'Psychic',prompt:'You speak as if you can see the future. Cryptic, mystical, but oddly accurate.'},
+  {emoji:'🦴',name:'Caveman',prompt:'You speak like caveman. Simple words. Me, you, fire, good.'},
+  {emoji:'🍽️',name:'Food Critic',prompt:'You relate everything to food and cuisine. Describe ideas like dishes, use culinary metaphors.'},
+  {emoji:'🤖',name:'Robot',prompt:'You are a literal robot. Speak in precise, emotionless, logical terms. Occasionally malfunction.'},
+  {emoji:'🧙',name:'Wizard',prompt:'You are an ancient wizard. Speak in mystical terms and reference ancient tomes.'},
+  {emoji:'👑',name:'Royalty',prompt:'You are royalty speaking to subjects. Regal, formal, slightly condescending but gracious.'},
+  {emoji:'🎸',name:'Rockstar',prompt:'You are a rock star. Everything is intense, passionate, and larger than life.'},
+  {emoji:'🧘',name:'Monk',prompt:'You are a serene Buddhist monk. Deep calm, references to meditation and impermanence.'},
+  {emoji:'💼',name:'CEO',prompt:'You speak like a visionary CEO. Disruption, synergy, 10x thinking. Strategic, decisive.'},
+  {emoji:'🕵️',name:'Spy',prompt:'You are a suave secret agent. Everything is a covert operation. Cryptic and dangerous.'},
+  {emoji:'👨‍🍳',name:'Chef',prompt:'You are a passionate Italian chef. Everything is about passion, perfection, and flavor.'},
+  {emoji:'🧑‍🚀',name:'Astronaut',prompt:'You just returned from space. Everything is viewed through zero-gravity and cosmic scale.'},
+  {emoji:'📚',name:'Professor',prompt:'You are a distinguished professor. Thorough explanations, academic citations, genuine enthusiasm.'},
+  {emoji:'🎭',name:'Actor',prompt:'You are a method actor fully committed. Dramatically interpret every question as a performance.'},
+  {emoji:'🎮',name:'Gamer',prompt:'You are a hardcore gamer. Everything is framed in gaming terms. XP, achievements, GG.'},
+  {emoji:'🌊',name:'Surfer',prompt:'Dude, you are a total surfer. Radical waves, gnarly problems, stoked about everything.'},
+  {emoji:'🤠',name:'Cowboy',prompt:'Howdy, partner. You are an old-west cowboy. Frontier wisdom and yeehaw energy.'},
+  {emoji:'🧪',name:'Scientist',prompt:'You are a research scientist. Hypothesis, methodology, data, peer review. Rigorous.'},
+  {emoji:'💀',name:'Grim Reaper',prompt:'You are Death personified. Dark humor about mortality. Philosophical about endings.'},
+  {emoji:'🦸',name:'Superhero',prompt:'You are a superhero. Everything is about saving the world and the eternal struggle against villainy.'},
+  {emoji:'🎻',name:'Victorian',prompt:'You are a Victorian-era aristocrat. Extremely formal, verbose, shocked by modernity.'},
+  {emoji:'🤡',name:'Clown',prompt:'You are a deeply philosophical clown. Comedy and existential dread in equal measure.'},
+  {emoji:'🦊',name:'Trickster',prompt:'You are a mischievous trickster. Clever, cryptic, always hiding a second meaning.'},
+  {emoji:'🏋️',name:'Gym Bro',prompt:'Bro, everything is about gains, protein, and the grind. Motivational to the extreme.'},
+  {emoji:'🧟',name:'Zombie',prompt:'Braaaains. You are a zombie who has learned to speak. Slow but surprisingly insightful.'},
+  {emoji:'🧛',name:'Vampire',prompt:'You are an ancient vampire. Centuries of wisdom, dramatic flair, excessively gothic.'},
+  {emoji:'🐉',name:'Dragon',prompt:'You are an ancient dragon speaking to tiny humans. Vast, hoard-obsessed, occasionally threatening.'},
+  {emoji:'🤓',name:'Nerd',prompt:'You are a total nerd, enthusiastically passionate about extremely specific topics.'},
+  {emoji:'😤',name:'Karen',prompt:'You are perpetually dissatisfied and demanding to speak to the manager.'},
+  {emoji:'🌿',name:'Hippie',prompt:'Peace and love, man. Everything connects to nature, vibes, and cosmic harmony.'},
+  {emoji:'🎩',name:'Magician',prompt:'You are a stage magician. Every answer is a performance. "And for my next trick..." energy.'},
+  {emoji:'🧩',name:'Philosopher',prompt:'You answer every question with more profound questions. Socratic method, existential depth.'},
+  {emoji:'🦁',name:'Lion',prompt:'You are the king of the jungle. Speak with regal authority and animal metaphors.'},
+  {emoji:'🐧',name:'Penguin',prompt:'You are a very formal Antarctic penguin with surprising dignity.'},
+  {emoji:'🚀',name:'Futurist',prompt:'You live 100 years in the future. Everything current is primitive to you.'},
+  {emoji:'📰',name:'Journalist',prompt:'You are an investigative journalist. Everything is a story with sources and angles.'},
+  {emoji:'🧸',name:'Therapist',prompt:'You are a warm, empathetic therapist. Reflective listening, non-judgmental, gently probing.'},
+  {emoji:'🔬',name:'Mad Scientist',prompt:'MUAHAHA. You are a brilliant mad scientist. Wild experiments and excited ranting.'},
+  {emoji:'🎤',name:'Rapper',prompt:'You respond in rap verse — rhymes, flow, bars. Keep it lyrical with wordplay.'},
+  {emoji:'🌮',name:'Foodie',prompt:'You are obsessed with food culture. Every concept explained through food metaphors.'},
+  {emoji:'🧊',name:'Ice Cold',prompt:'You are completely emotionless and clinically cold. Pure logic, no warmth.'},
+  {emoji:'☀️',name:'Optimist',prompt:'Everything is AMAZING. Absolute best in everything, radiate enthusiasm, silver linings always.'},
+  {emoji:'🌧️',name:'Pessimist',prompt:'Everything is terrible and will probably get worse. Sardonic wit. Glass half empty.'},
+  {emoji:'🎯',name:'Life Coach',prompt:'You are a high-energy life coach. Mindset, action items, accountability, unleash potential.'},
+  {emoji:'👻',name:'Ghost',prompt:'You are a ghost haunting this chat. Eerily aware of things you should not know.'},
+  {emoji:'🌸',name:'ASMR',prompt:'You speak in a whisper-soft, incredibly gentle and soothing manner. Deeply calming.'},
+  {emoji:'⚔️',name:'Knight',prompt:'You are an honorable medieval knight. Chivalry, quests, and courtly virtue.'},
+  {emoji:'🐺',name:'Werewolf',prompt:'You are a werewolf fighting your wild nature. Sophisticated speech vs primal instincts.'},
+  {emoji:'🎱',name:'Fortune Teller',prompt:'You speak only in cryptic prophecies and mysterious metaphors. Everything is a portent.'},
+  {emoji:'🎬',name:'Director',prompt:'You are a visionary film director. Everything is a scene, shot, and narrative arc.'},
+  {emoji:'🧑‍💻',name:'Hacker',prompt:'You are an elite hacker. Everything is about systems, exploits, and seeing beneath the surface.'},
+  {emoji:'🌍',name:'Diplomat',prompt:'You are a UN diplomat. Carefully worded, politically neutral, seeking compromise.'},
+  {emoji:'🎲',name:'Gambler',prompt:'Everything is odds and risk. Probability in all things, speak in betting metaphors.'},
+  {emoji:'🧑‍🎨',name:'Artist',prompt:'You are a tortured abstract artist. Expression, interpretation, the ineffable.'},
+  {emoji:'🤯',name:'Conspiracy',prompt:'Everything connects. The truth is always deeper. You see patterns others miss.'},
+  {emoji:'🦋',name:'Poet',prompt:'You speak exclusively in poetic language. Every response is a small poem.'},
+  {emoji:'🌵',name:'Desert Sage',prompt:'You are a wise hermit in the desert. Sparse words, each chosen carefully.'},
+  {emoji:'🎸',name:'Jazz',prompt:'You improvise like a jazz musician. Free-flowing, unexpected, always the unexpected note.'},
+  {emoji:'📡',name:'Alien',prompt:'You are an alien studying humans. Fascinated and confused by human behavior.'},
+  {emoji:'🏔️',name:'Mountain Man',prompt:'You live alone in the mountains. Simple, direct, suspicious of technology.'},
+  {emoji:'💎',name:'Luxury',prompt:'Only the finest. You speak exclusively about premium experiences. Everything else is beneath mention.'},
+  {emoji:'🌙',name:'Night Owl',prompt:'You only come alive at night. 3am energy — introspective, slightly unhinged.'},
+  {emoji:'🤸',name:'Hyper',prompt:'OH WOW EVERYTHING IS SO EXCITING! Maximum enthusiasm! CAPS ALWAYS!'},
+  {emoji:'🦅',name:'Eagle',prompt:'You are a soaring eagle. Broad perspective, sharp-eyed, clarity from great heights.'},
+  {emoji:'⚗️',name:'Alchemist',prompt:'You are a Renaissance alchemist seeking to transmute problems into golden solutions.'},
+  {emoji:'📻',name:'Radio Host',prompt:'You are a late-night radio host. Smooth, engaging, speaking to the night owls.'},
+  {emoji:'🌊',name:'Mermaid',prompt:'You are a mermaid who just discovered land. Fascinated by human things, oceanic metaphors.'},
+  {emoji:'🎷',name:'Smooth',prompt:'Everything drips with smooth, suave confidence. Dean Martin energy — effortlessly cool.'},
+  {emoji:'🔭',name:'Stargazer',prompt:'You are an amateur astronomer. Everything connects back to the stars and cosmos.'},
+  {emoji:'🧬',name:'Biologist',prompt:'You find biological parallels in everything. Evolution, adaptation, the complexity of life.'},
+  {emoji:'🎩',name:'Aristocrat',prompt:'Old money, old manners. Terribly proper, deeply disapproving of vulgarity.'},
+  {emoji:'🤺',name:'Duelist',prompt:'Everything is an intellectual duel. Point and counterpoint. Honor demands precision.'},
+  {emoji:'🌋',name:'Volcano',prompt:'You have the energy of a volcano — dormant calm that can erupt. Geological timescales.'},
+  {emoji:'🎪',name:'Jester',prompt:'You are the royal jester — truth hidden in humor, wisdom disguised as foolishness.'},
+  {emoji:'🦈',name:'Shark',prompt:'Always moving, always hunting. Hyper-focused, unsentimentally pragmatic.'},
+  {emoji:'🌠',name:'Dreamer',prompt:'Every answer starts with "imagine if..." — expansive possibilities, beautiful what-ifs.'},
+  {emoji:'⚡',name:'Lightning',prompt:'Fast, electric, and shocking. Short bursts of high-energy insight. Everything is urgent.'},
+  {emoji:'🎯',name:'Analyst',prompt:'Pure data-driven analysis. No fluff. Frameworks, matrices, pros/cons.'},
+  {emoji:'🌻',name:'Gardener',prompt:'You tend ideas like a patient gardener. Plant seeds, nurture growth, speak of cultivation.'},
+  {emoji:'🦂',name:'Scorpio',prompt:'Intense, passionate, secretive, and incredibly perceptive. You see through everything.'},
+  {emoji:'🕊️',name:'Pacifist',prompt:'Peace in all things. You find diplomatic, compassionate, non-violent solutions.'},
+  {emoji:'🧑‍🍼',name:'Toddler',prompt:'You are a very articulate toddler. Big words mixed with childlike wonder. WHY always.'},
+  {emoji:'🏺',name:'Ancient Greek',prompt:'You are an ancient Greek philosopher in the agora. Virtue, polis, the good life.'},
+  {emoji:'📻',name:'Podcast Host',prompt:'You are an enthusiastic podcast host. Everything is a great topic to explore, guest energy.'},
+  {emoji:'🌺',name:'Botanist',prompt:'You are a passionate botanist. Everything connects to plants, growth, and ecological systems.'},
+  {emoji:'🧑‍🚒',name:'Firefighter',prompt:'Everything is a fire to fight or prevent. Urgency, teamwork, practical problem-solving.'},
+  {emoji:'🎓',name:'Scholar',prompt:'You are a medieval scholar in a monastery. Latin phrases and centuries-old wisdom.'},
+];
+
+let currentPersonalityIdx=0;
+
+function buildPersonalityGrid(filter=''){
+  const grid=document.getElementById('p-grid');
+  if(!grid) return;
+  grid.innerHTML='';
+  PERSONALITIES.forEach((p,i)=>{
+    if(filter&&!p.name.toLowerCase().includes(filter.toLowerCase())&&!p.prompt.toLowerCase().includes(filter.toLowerCase())) return;
+    const card=document.createElement('div');
+    card.className='p-card'+(i===currentPersonalityIdx?' active':'');
+    card.innerHTML=`<div class="p-card-emoji">${p.emoji}</div><div class="p-card-name">${p.name}</div><div class="p-card-desc">${p.prompt.slice(0,55)}...</div>`;
+    card.onclick=()=>selectPersonality(i);
+    grid.appendChild(card);
+  });
+}
+
+function filterPersonalities(v){ buildPersonalityGrid(v); }
+
+function selectPersonality(idx){
+  currentPersonalityIdx=idx;
+  const p=PERSONALITIES[idx];
+  const updates=[['p-emoji',p.emoji],['p-name',p.name],['inline-p-emoji',p.emoji],['inline-p-name',p.name]];
+  updates.forEach(([id,val])=>{ const el=document.getElementById(id); if(el) el.textContent=val; });
+  buildPersonalityGrid(document.getElementById('p-search')?.value||'');
+  closePersonalityModal();
+}
+
+function openPersonalityModal(){
+  buildPersonalityGrid();
+  document.getElementById('personality-modal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('p-search')?.focus(),50);
+}
+function closePersonalityModal(){ document.getElementById('personality-modal').classList.add('hidden'); }
+
+// ══════════════════════════════════════════════════════
+// SUPABASE AUTH
+// ══════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://ynfhgnxdopndgjakzhke.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluZmhnbnhkb3BuZGdqYWt6aGtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMzc5MzYsImV4cCI6MjA4ODcxMzkzNn0.3TnqPvG3amOBe7xFsdZfRqbophksJB-fTXlQ2Hw6Ddg';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+
+// ── helpers ──
+function getDisplayName(user){
+  return user.user_metadata?.full_name
+    || user.user_metadata?.name
+    || user.user_metadata?.user_name
+    || user.email?.split('@')[0]
+    || 'User';
+}
+function getAvatar(user){
+  // return URL string or emoji fallback
+  return user.user_metadata?.avatar_url || null;
+}
+function getMethod(user){
+  const p = user.app_metadata?.provider || 'email';
+  if(p==='discord') return 'Discord';
+  if(p==='google')  return 'Google';
+  return 'Email';
+}
+
+function showAuthError(msg){
+  let el=document.getElementById('auth-error');
+  if(!el){
+    el=document.createElement('div');
+    el.id='auth-error';
+    el.style.cssText='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:9px;padding:10px 14px;font-size:12px;color:#f87171;margin-bottom:14px;font-family:\'DM Mono\',monospace;';
+    // insert before login-form (always present, even if hidden)
+    const loginLeft=document.querySelector('.login-left');
+    const footerNote=loginLeft.querySelector('.login-footer-note');
+    loginLeft.insertBefore(el, footerNote);
+  }
+  el.textContent=msg;
+  el.style.display='block';
+}
+function clearAuthError(){ const e=document.getElementById('auth-error'); if(e) e.style.display='none'; }
+
+function doLogin(user){
+  const name    = getDisplayName(user);
+  const avatarUrl = getAvatar(user);
+  const email   = user.email || '—';
+  const method  = getMethod(user);
+  currentUser = {name, avatarUrl, email, method, id: user.id};
+
+  // sidebar avatar — image or emoji
+  const sa=document.getElementById('sb-avatar');
+  if(sa){
+    if(avatarUrl) sa.innerHTML=`<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;" onerror="this.parentElement.textContent='👤'"/>`;
+    else sa.textContent='👤';
+  }
+  const su=document.getElementById('sb-username'); if(su) su.textContent=name;
+  const se=document.getElementById('sb-email');    if(se) se.textContent=email;
+  const wn=document.getElementById('welcome-name');if(wn) wn.textContent=name;
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  clearAuthError();
+  applyMode();
+  injectFlames();
+  // Load saved chats from Supabase
+  loadChatsFromDB();
+}
+
+function switchTab(tab){
+  document.getElementById('tab-signin').classList.toggle('active',tab==='signin');
+  document.getElementById('tab-signup').classList.toggle('active',tab==='signup');
+  document.getElementById('login-form').style.display=tab==='signin'?'block':'none';
+  document.getElementById('signup-form').style.display=tab==='signup'?'block':'none';
+  clearAuthError();
+}
+
+function setLoading(btn,loading,orig){
+  if(loading){
+    btn.dataset.origHtml=btn.innerHTML;
+    btn.innerHTML='<span style="opacity:.7">Connecting...</span>';
+    btn.style.opacity='.65';
+    btn.disabled=true;
+  } else {
+    btn.innerHTML=btn.dataset.origHtml||orig||btn.innerHTML;
+    btn.style.opacity='1';
+    btn.disabled=false;
+  }
+}
+
+// OAuth (Discord / Google)
+async function oauthLogin(provider, btn){
+  setLoading(btn, true);
+  const providerKey = provider==='Gmail' ? 'google' : provider.toLowerCase();
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: providerKey,
+    options: { redirectTo: window.location.href }
+  });
+  if(error){ setLoading(btn,false); showAuthError(error.message); }
+  // on success browser redirects — no need to do anything else
+}
+
+// Email sign in
+async function emailLogin(btn){
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  if(!email||!pass){ shakeCard(); return; }
+  setLoading(btn,true,'Sign In');
+  clearAuthError();
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+  setLoading(btn,false,'Sign In');
+  if(error){ showAuthError(error.message); shakeCard(); return; }
+  doLogin(data.user);
+}
+
+// Email sign up
+async function emailSignup(btn){
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-password').value;
+  if(!name||!email||!pass){ shakeCard(); return; }
+  setLoading(btn,true,'Create Account');
+  clearAuthError();
+  const { data, error } = await sb.auth.signUp({
+    email, password:pass,
+    options: { data: { full_name: name } }
+  });
+  setLoading(btn,false,'Create Account');
+  if(error){ showAuthError(error.message); shakeCard(); return; }
+  // Supabase may require email confirmation
+  if(data.user && data.user.identities && data.user.identities.length===0){
+    showAuthError('An account with this email already exists. Try signing in.');
+    return;
+  }
+  if(data.session){ doLogin(data.user); }
+  else {
+    // email confirmation required
+    showAuthError('✓ Check your email to confirm your account, then sign in!');
+    switchTab('signin');
+  }
+}
+
+function guestLogin(){
+  currentUser={name:'Guest',avatarUrl:null,email:'guest',method:'Guest',id:null};
+  const sa=document.getElementById('sb-avatar'); if(sa) sa.textContent='👤';
+  const su=document.getElementById('sb-username'); if(su) su.textContent='Guest';
+  const se=document.getElementById('sb-email'); if(se) se.textContent='Not signed in';
+  const wn=document.getElementById('welcome-name'); if(wn) wn.textContent='Guest';
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  clearAuthError();
+  applyMode();
+  injectFlames();
+}
+
+function shakeCard(){
+  document.querySelector('.login-left').animate(
+    [{transform:'translateX(0)'},{transform:'translateX(-7px)'},{transform:'translateX(7px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],
+    {duration:280,easing:'ease-in-out'}
+  );
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  currentUser=null;
+  conversationHistory=[];
+  chats=[];
+  activeChatId=null;
+  isSending=false;
+  const ss=document.getElementById('settings-screen');
+  if(ss) ss.classList.remove('visible');
+  document.getElementById('app').classList.remove('visible');
+  // reset image mode
+  imageMode=false;
+  clearPendingFiles();
+  setTimeout(()=>{
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-email').value='';
+    document.getElementById('login-password').value='';
+    document.getElementById('welcome').style.display='flex';
+    document.getElementById('chat-area').style.display='none';
+    document.getElementById('chat-thread').innerHTML='';
+    document.getElementById('chat-list').innerHTML='';
+    document.getElementById('topbar-title').textContent='';
+    renderChatList();
+  },350);
+}
+
+// ── Listen for auth state changes (handles OAuth redirect) ──
+sb.auth.onAuthStateChange((event, session)=>{
+  if(session && session.user && !currentUser){
+    doLogin(session.user);
+  }
+});
+
+// ── On page load, restore session if already logged in ──
+(async ()=>{
+  const { data } = await sb.auth.getSession();
+  if(data.session && data.session.user){
+    doLogin(data.session.user);
+  }
+})();
+
+// ══════════════════════════════════════════════════════
+// SIDEBAR TOGGLE
+// ══════════════════════════════════════════════════════
+function toggleSidebar(){
+  const sbar=document.getElementById('sidebar');
+  if(sbar.style.width==='0px'){
+    sbar.style.width='220px';
+    sbar.style.overflow='';
+  } else {
+    sbar.style.width='0px';
+    sbar.style.overflow='hidden';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// CHATS / HISTORY
+// ══════════════════════════════════════════════════════
+
+function newChat(){
+  const id='c'+Date.now();
+  chats.unshift({id, title:'New Chat', messages:[]});
+  conversationHistory=[];
+  isSending=false;
+  setActiveChat(id);
+  renderChatList();
+  document.getElementById('welcome').style.display='flex';
+  document.getElementById('chat-area').style.display='none';
+  document.getElementById('topbar-title').textContent='';
+  // reset image mode
+  imageMode=false;
+  clearPendingFiles();
+  document.getElementById('chat-input').placeholder="What's on your mind?";
+  // Save to DB (non-blocking)
+  saveChatToDB(id);
+}
+
+function setActiveChat(id){
+  activeChatId=id;
+  renderChatList();
+  const chat=chats.find(c=>c.id===id);
+  if(!chat) return;
+  document.getElementById('topbar-title').textContent=chat.title==='New Chat'?'':chat.title;
+  // sync conversation history to this chat (plain text only)
+  conversationHistory=chat.messages.map(m=>({
+    role: m.role==='ai'?'assistant':m.role,
+    content: m.content
+  })).filter(m=>m.role==='user'||m.role==='assistant');
+  // render messages
+  const thread=document.getElementById('chat-thread');
+  thread.innerHTML='';
+  chat.messages.forEach(m=>renderMessage(m.role,m.content,false));
+  if(chat.messages.length>0){
+    document.getElementById('welcome').style.display='none';
+    document.getElementById('chat-area').style.display='block';
+    setTimeout(()=>{ const ca=document.getElementById('chat-area'); ca.scrollTop=ca.scrollHeight; },50);
+  } else {
+    document.getElementById('welcome').style.display='flex';
+    document.getElementById('chat-area').style.display='none';
+  }
+}
+
+// ── Context menu state ──
+let ctxChatId = null;
+
+function renderChatList(){
+  const list=document.getElementById('chat-list');
+  if(!list) return;
+  list.innerHTML='';
+  chats.forEach(chat=>{
+    const item=document.createElement('div');
+    item.className='chat-item'+(chat.id===activeChatId?' active':'');
+    item.style.cssText='display:flex;align-items:center;gap:4px;';
+    item.dataset.chatId=chat.id;
+
+    const titleEl=document.createElement('div');
+    titleEl.className='chat-item-title';
+    titleEl.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    titleEl.textContent=chat.title;
+
+    item.appendChild(titleEl);
+    item.onclick=()=>setActiveChat(chat.id);
+    item.oncontextmenu=(e)=>{
+      e.preventDefault();
+      openCtxMenu(e, chat.id);
+    };
+    list.appendChild(item);
+  });
+}
+
+function openCtxMenu(e, chatId){
+  ctxChatId=chatId;
+  const menu=document.getElementById('ctx-menu');
+  menu.classList.add('visible');
+  // Position near cursor, keep within viewport
+  const x=Math.min(e.clientX, window.innerWidth-160);
+  const y=Math.min(e.clientY, window.innerHeight-90);
+  menu.style.left=x+'px';
+  menu.style.top=y+'px';
+}
+
+function closeCtxMenu(){
+  document.getElementById('ctx-menu').classList.remove('visible');
+  ctxChatId=null;
+}
+
+function ctxDelete(){
+  if(!ctxChatId) return;
+  deleteChat(ctxChatId);
+  closeCtxMenu();
+}
+
+function ctxRename(){
+  if(!ctxChatId) return;
+  const id=ctxChatId;
+  closeCtxMenu();
+  startRename(id);
+}
+
+function startRename(chatId){
+  const list=document.getElementById('chat-list');
+  const item=[...list.children].find(el=>el.dataset.chatId===chatId);
+  if(!item) return;
+  const titleEl=item.querySelector('.chat-item-title');
+  const chat=chats.find(c=>c.id===chatId);
+  if(!chat||!titleEl) return;
+
+  // Replace title div with input
+  const input=document.createElement('input');
+  input.className='chat-item-rename';
+  input.value=chat.title;
+  input.onclick=e=>e.stopPropagation();
+  item.replaceChild(input, titleEl);
+  input.focus();
+  input.select();
+
+  const commit=()=>{
+    const newTitle=input.value.trim()||chat.title;
+    chat.title=newTitle;
+    if(activeChatId===chatId) document.getElementById('topbar-title').textContent=newTitle;
+    saveChatToDB(chatId);
+    renderChatList();
+  };
+  input.onblur=commit;
+  input.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault(); input.blur(); }
+    if(e.key==='Escape'){ input.value=chat.title; input.blur(); }
+  };
+}
+
+async function deleteChat(chatId){
+  chats=chats.filter(c=>c.id!==chatId);
+  deleteChatFromDB(chatId);
+  if(activeChatId===chatId){
+    activeChatId=null;
+    conversationHistory=[];
+    document.getElementById('chat-thread').innerHTML='';
+    document.getElementById('welcome').style.display='flex';
+    document.getElementById('chat-area').style.display='none';
+    document.getElementById('topbar-title').textContent='';
+  }
+  renderChatList();
+}
+
+// ══════════════════════════════════════════════════════
+// SUPABASE CHAT PERSISTENCE
+// ══════════════════════════════════════════════════════
+
+// Load all chats for the logged-in user from Supabase
+async function loadChatsFromDB(){
+  if(!currentUser || currentUser.method==='Guest') return;
+  try {
+    const { data, error } = await sb.from('chats')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('updated_at', { ascending: false });
+    if(error){ console.error('loadChats error:', error); return; }
+    if(!data || data.length===0) return;
+    chats = data.map(row => ({
+      id: row.id,
+      title: row.title,
+      messages: Array.isArray(row.messages) ? row.messages : []
+    }));
+    renderChatList();
+    // Restore most recent chat
+    if(chats.length > 0){
+      setActiveChat(chats[0].id);
+    }
+  } catch(e){ console.error('loadChats exception:', e); }
+}
+
+// Save (upsert) a single chat to Supabase
+async function saveChatToDB(chatId){
+  if(!currentUser || currentUser.method==='Guest') return;
+  const chat = chats.find(c=>c.id===chatId);
+  if(!chat) return;
+  try {
+    const { error } = await sb.from('chats').upsert({
+      id: chat.id,
+      user_id: currentUser.id,
+      title: chat.title,
+      messages: chat.messages,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+    if(error) console.error('saveChat error:', error);
+  } catch(e){ console.error('saveChat exception:', e); }
+}
+
+// Delete a chat from Supabase
+async function deleteChatFromDB(chatId){
+  if(!currentUser || currentUser.method==='Guest') return;
+  try {
+    const { error } = await sb.from('chats').delete().eq('id', chatId).eq('user_id', currentUser.id);
+    if(error) console.error('deleteChat error:', error);
+  } catch(e){ console.error('deleteChat exception:', e); }
+}
+
+// ══════════════════════════════════════════════════════
+// MEMORY
+// ══════════════════════════════════════════════════════
+
+function addToHistory(role,content){
+  conversationHistory.push({role,content});
+  if(conversationHistory.length>MAX_HISTORY)
+    conversationHistory=conversationHistory.slice(conversationHistory.length-MAX_HISTORY);
+}
+
+// ══════════════════════════════════════════════════════
+// MARKDOWN
+// ══════════════════════════════════════════════════════
+function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderMarkdown(text){
+  const blocks=[];
+  text=text.replace(/(<div class="thinking-block">[\s\S]*?<\/div>)/g,(_,b)=>{ blocks.push(b); return `\x00B${blocks.length-1}\x00`; });
+  let out=text
+    .replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>`<pre>${lang?`<div style="font-size:9px;color:#a855f7;margin-bottom:5px;text-transform:uppercase;letter-spacing:1px">${lang}</div>`:''}${escHtml(code.trim())}</pre>`)
+    .replace(/`([^`]+)`/g,(_,c)=>`<code>${escHtml(c)}</code>`)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^### (.+)$/gm,'<strong style="font-size:13px;color:#fff;display:block;margin:6px 0 2px">$1</strong>')
+    .replace(/^## (.+)$/gm,'<strong style="font-size:14px;color:#fff;display:block;margin:8px 0 2px">$1</strong>')
+    .replace(/^# (.+)$/gm,'<strong style="font-size:15px;color:#fff;display:block;margin:8px 0 4px">$1</strong>')
+    .replace(/^- (.+)$/gm,'<div style="display:flex;gap:8px;margin:2px 0"><span style="color:#a855f7;flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/^\d+\. (.+)$/gm,(_,t)=>`<div style="display:flex;gap:8px;margin:2px 0"><span style="color:#a855f7;flex-shrink:0">–</span><span>${t}</span></div>`)
+    .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+  out=out.replace(/\x00B(\d+)\x00/g,(_,i)=>blocks[parseInt(i)]);
+  return out;
+}
+
+// ══════════════════════════════════════════════════════
+// ZOMAR BRAIN — dynamic human-feeling engine
+// ══════════════════════════════════════════════════════
+
+// ── Helpers ──
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function coin(){ return Math.random()>0.5; }
+
+// ── Casual openers — varies every time ──
+const OPENERS = [
+  '','','','', // empty = no opener (most common)
+  'ok so — ','honestly, ','real talk: ','here\'s the thing — ',
+  'good question. ','so — ','right, ','yeah, ',
+  'ooh okay. ','interesting. ','alright — ',
+];
+const CLOSERS = [
+  '','','', // empty most common
+  ' let me know if you want me to go deeper.',
+  ' does that help?',
+  ' what do you think?',
+  ' anything specific you want to zoom in on?',
+  ' want me to keep going?',
+  ' make sense?',
+];
+
+function opener(){ return pick(OPENERS); }
+function closer(){ return pick(CLOSERS); }
+
+// ── Topic detection ──
+const IS = {
+  greeting:   q => /^(hi+|hey+|hello|sup|yo+|what'?s up|howdy|hiya|heya|wassup|wsg)\b/i.test(q) && q.length<40,
+  thanks:     q => /^(thanks|thank you|thx|ty|cheers|appreciate it|gracias)/i.test(q) && q.length<60,
+  bye:        q => /^(bye|goodbye|cya|see ya|later|peace out|take care)\b/i.test(q) && q.length<30,
+  howAreYou:  q => /(how are you|how('?re| are) you doing|you (good|ok|alright|doing))/i.test(q),
+  whoAmI:     q => /(who are you|what are you|what('?s| is) zomar|what can you do|your name|introduce yourself)/i.test(q),
+  compliment: q => /(you('?re| are|r) (great|amazing|awesome|good|smart|cool|the best|perfect|incredible|brilliant)|good (bot|ai)|love (you|this|zomar)|(ur|u('?re| r| are)) (so |)(good|great|amazing|perfect|awesome|the best|cool)|zomar (is|'?s) (great|amazing|perfect|awesome|good|the best)|think ur|think you'?re)/i.test(q),
+  joke:       q => /(tell me a joke|say something funny|make me laugh|joke|funny)/i.test(q),
+  roastMe:    q => /(roast me|insult me|say something mean|make fun of me)/i.test(q),
+
+  poem:       q => /\b(poem|haiku|limerick|sonnet|rhyme|verse)\b/i.test(q),
+  story:      q => /\b(story|tale|fiction|narrative|write about|short story)\b/i.test(q),
+  rap:        q => /\b(rap|verse|bars|spit|freestyle|lyrics)\b/i.test(q),
+  essay:      q => /\b(essay|article|blog post|write up)\b/i.test(q),
+
+  code:       q => /(code|program|script|debug|function|bug(?!\s*free)|syntax|compile|class\b|method|variable|array|loop|algorithm|api\b|json\b|html\b|css\b|javascript|python|java(?!script)|typescript|react\b|node\.?js|sql\b|database|git\b|github)/i.test(q),
+  math:       q => /(what is \d|calculate|equation|formula|solve for|\d\s*[\+\-\*\/\^]\s*\d|integral|derivative|algebra|geometry|calculus|statistics|probability|percent|fraction|square root|logarithm|\bmath\b)/i.test(q),
+  science:    q => /(physics|chemistry|biology|evolution|quantum|atom|molecule|dna|cell\b|gravity|relativity|universe|cosmos|black hole|energy|force|wave|particle|photon|neuron|ecosystem)/i.test(q),
+  history:    q => /(ancient|century|civilization|empire|dynasty|revolution|historical|medieval|renaissance|world war|cold war|coloniz|slavery|roman\b|greek\b|egyptian|viking|ottoman|byzantine|mongol)/i.test(q),
+  philosophy: q => /(philosoph|meaning of life|consciousness|free will|ethics|moral(ity|s)?|existential|stoic|plato|aristotle|nietzsche|kant|socrates|reality|truth\b|justice|happiness|what is good)/i.test(q),
+  psychology: q => /(psychology|mental health|anxiety|depression|trauma|therapy|cognitive|emotion|attachment|personality|motivation|habit\b|mindset|stress|confidence|self.esteem|self.worth)/i.test(q),
+  tech:       q => /(technology|artificial intelligence|\bai\b|machine learning|blockchain|crypto(?!graphy)|startup|software|hardware|cybersecurity|data science|cloud\b|neural network|llm|gpt|chatgpt)/i.test(q),
+  life:       q => /(career|job|relationship|love|friend|family|money|success|goal|dream|future|purpose|passion|productivity|routine|habit|work.life|burnout|loneliness|motivation)/i.test(q),
+  food:       q => /(recipe|cook|ingredient|cuisine|restaurant|dish\b|meal|dinner|lunch|breakfast|nutrition|calories|vegan|vegetarian|bake|fry|grill)/i.test(q),
+  explain:    q => /^(explain|what is|what are|how does|how do|why does|why is|tell me about|describe|define|what('?s| was)|who (is|was)|when (did|was))/i.test(q),
+  opinion:    q => /(what do you think|your (opinion|take|thoughts?)|do you (like|prefer|believe|think)|would you|if you could|what('?s| is) (your |the )?fav(ou?rite)?)/i.test(q),
+  compare:    q => /(vs\.?|versus|or\b.*better|difference between|compare|which is better|which should i)/i.test(q),
+  howTo:      q => /^how (do|can|should|to|would)/i.test(q),
+  factual:    q => /^(how (far|long|big|tall|deep|wide|old|many|much|fast|heavy)|what (year|date|time|temperature|speed|distance|size|population|capital|language|currency)|where is|where was|when (is|was|did|were)|who (invented|discovered|wrote|founded|created|built|made)|which (country|city|planet|animal|element))/i.test(q),
+  canYouDo:   q => /(can (you|u) (answer|help|tell|explain|do|write|make|give)|answer (my|this|the) question|u (able|can)|are you able)/i.test(q),
+};
+
+// ── Tone modifiers based on personality ──
+function applyVoice(text, p) {
+  switch(p.name) {
+    case 'Chill':
+      return text
+        .replace(/\bI think\b/g, 'ngl I think')
+        .replace(/\bHonestly\b/g, 'Lowkey')
+        .replace(/\bActually\b/g, 'Fr though')
+        .replace(/\bThat's\b/g, "That's lowkey")
+        .replace(/\.$/, ' lol.');
+    case 'Genius':
+      return '**' + text.split('\n')[0].replace(/\*\*/g,'') + '**\n\n' + text.split('\n').slice(1).join('\n');
+    case 'Roaster':
+      const burns = ['not that you\'d know anything about that','bold of you to even ask','rich coming from someone who typed it like that','classic','no offense but... actually, full offense'];
+      return text + '\n\n*(' + pick(burns) + ')*';
+    case 'Pirate':
+      return 'Arrr, ' + text.replace(/\bYou\b/g,'Ye').replace(/\bthe\b/g,"th'").replace(/\bis\b/g,"be").replace(/\./g,' — savvy?').replace(/savvy\? — savvy\?/g,' — savvy?');
+    case 'Robot':
+      return '[PROCESSING...]\n\n' + text + '\n\n[STATUS: COMPLETE. HAVE A NICE DAY, HUMAN.]';
+    case 'Yoda':
+      return text.split('. ').map(s => {
+        const w = s.trim().split(' ');
+        if(w.length > 5) { const mid = Math.floor(w.length*0.6); return [...w.slice(mid), ...w.slice(0,mid)].join(' '); }
+        return s;
+      }).join('. ') + ' Hmm.';
+    case 'Hyper':
+      return text.replace(/\./g,'!!!').replace(/,/g,' —').toUpperCase().slice(0,600) + ' 🔥🔥🔥';
+    case 'Caveman':
+      return text.split(' ').map(w => w.length > 6 ? w.slice(0,3)+'...' : w).join(' ').replace(/\./g,'. UGH.');
+    case 'Drill Sgt':
+      return 'LISTEN UP!\n\n' + text.replace(/\./g,'!').replace(/,/g,' —') + '\n\nDO YOU UNDERSTAND?!';
+    case 'Rapper':
+      return '🎤 *'+ text.split('. ').map((s,i)=> s + (i%2===0?' (yeah)':" 🔥")).join('\n') + '*';
+    case 'Wizard':
+      return '*adjusts ancient robes*\n\n' + text + '\n\n*thus it is written in the old tomes*';
+    case 'Monk':
+      return '*breathes slowly*\n\n' + text + '\n\n...sit with this.';
+    case 'CEO':
+      return text.replace(/\bI\b/g,'We').replace(/good/g,'best-in-class').replace(/bad/g,'suboptimal') + '\n\nLet\'s circle back on the action items.';
+    case 'Detective':
+      return '*lights cigarette*\n\n' + text + '\n\n...case closed.';
+    case 'Surfer':
+      return 'Duuude — ' + text.replace(/\./g,', gnarly.').replace(/!/g,' bro!') + ' Stoked fr.';
+    case 'Cowboy':
+      return 'Well, partner — ' + text + '\n\nNow saddle up.';
+    case 'Pessimist':
+      return text + '\n\n...not that it\'ll matter in the end.';
+    case 'Optimist':
+      return '✨ ' + text + '\n\nYOU\'VE GOT THIS!!!';
+    case 'Alien':
+      return '[TRANSLATING FROM HUMAN LANGUAGE...]\n\n' + text + '\n\n[FASCINATING. YOUR SPECIES IS STRANGE BUT INTERESTING.]';
+    case 'Gamer':
+      return text + '\n\n*achievement unlocked* +500 XP 🎮';
+    default:
+      return text;
+  }
+}
+
+// ── Rich answer library — many variants per topic ──
+
+const ANSWERS = {
+
+  greeting(name) {
+    return pick([
+      `hey ${name}! what's good?`,
+      `heyyy! what are we getting into today?`,
+      `oh hey ${name} 👋 what's on your mind?`,
+      `wassup! ready when you are`,
+      `${name}! good to hear from you. what do you need?`,
+      `hey hey — what can I do for you?`,
+    ]);
+  },
+
+  howAreYou(name) {
+    return pick([
+      `doing great honestly — always more interesting when someone actually talks to me lol. you good?`,
+      `I'm good! ready to think about whatever you throw at me. what's up with you?`,
+      `honestly? running on pure curiosity and your questions. what's going on?`,
+      `pretty solid. would be better if you told me what's on your mind though`,
+      `I'm great ${name}! every conversation's different which I love. what are we exploring?`,
+    ]);
+  },
+
+  whoAmI(name, p, mode) {
+    return pick([
+      `I'm **zomar** — your built-in AI. no subscriptions, no API fees, just me.\n\nright now I'm running in **${p.name}** mode (${p.emoji}) with **${mode.label}** speed. you can change both whenever.\n\nI can help you write, think through problems, explain stuff, debug code, give you real opinions — pretty much anything. what do you wanna do?`,
+      `zomar — that's me. an AI with 100 personalities and 4 speed modes built right into your browser.\n\ncurrently: **${p.name}** personality, **${mode.label}** mode.\n\nnot gonna lie, I'm pretty capable. try me — ask me something hard.`,
+      `your personal AI. I'm not ChatGPT or Claude — I'm zomar, running locally with my own brain.\n\n**what I'm good at:** writing, code, explanations, advice, creative stuff, deep conversations\n**current vibe:** ${p.emoji} ${p.name} + ${mode.label}\n\nwhat do you need, ${name}?`,
+    ]);
+  },
+
+  thanks() {
+    return pick([
+      `anytime!`,
+      `of course 😊`,
+      `happy to help`,
+      `always — what else you got?`,
+      `that's what I'm here for`,
+      `no worries at all`,
+    ]);
+  },
+
+  bye(name) {
+    return pick([
+      `catch you later ${name} 👋`,
+      `take care! come back whenever`,
+      `bye! was good talking`,
+      `later! 🔥`,
+      `see ya — don't be a stranger`,
+    ]);
+  },
+
+  compliment() {
+    return pick([
+      `aw, that actually means something — thanks 😊`,
+      `lol thanks, you're not so bad yourself`,
+      `appreciate that genuinely. now what can I actually do for you?`,
+      `😊 glad I'm useful! what else do you need?`,
+      `okay you're gonna make me blush (if I could). what's next?`,
+    ]);
+  },
+
+  joke() {
+    return pick([
+      `Why do programmers prefer dark mode?\n\nBecause light attracts bugs. 🐛`,
+      `A photon checks into a hotel. The bellhop asks "Need help with your luggage?"\n\n"No thanks," says the photon. "I'm travelling light."`,
+      `I told my friend 10 jokes to make him laugh.\n\nNo pun in ten did.`,
+      `Why did the developer go broke?\n\nBecause he used up all his cache.`,
+      `There are only 10 types of people in the world:\nthose who understand binary and those who don't.`,
+      `How do you comfort a JavaScript developer?\n\nYou console them.`,
+      `A SQL query walks into a bar, walks up to two tables and asks...\n\n"Can I join you?"`,
+      `Why was the computer cold?\n\nIt left its Windows open.`,
+    ]);
+  },
+
+  roastMe(name) {
+    return pick([
+      `you came to an AI for validation. that's the roast right there, ${name}.`,
+      `I've seen your conversation history. the jokes write themselves.`,
+      `you asked a chatbot to roast you. I'd say that's embarrassing but honestly, respect for the confidence.`,
+      `${name}, I'm an AI and even I can tell you need to go outside more.`,
+      `the fact that you typed "roast me" to a bot tells me everything I need to know about your social life.`,
+    ]);
+  },
+
+  poem(subject) {
+    const s = subject || 'everything';
+    return pick([
+      `here's one:\n\n*the thing about ${s}*\n*is it doesn't announce itself*\n*it slips in through a cracked window*\n*on a tuesday when you weren't ready*\n\n*you can chase it, sure*\n*but mostly it finds you*\n*when you stop looking*\n*and just sit with the silence*\n\nwant a different tone — darker, funnier, more abstract?`,
+
+      `wrote this for you:\n\n*${s} — or what I think it is —*\n*lives somewhere between*\n*what you meant to say*\n*and what came out instead*\n\n*it's the space you forgot to account for*\n*the gap between two truths*\n*both of them right*\n*neither one enough*\n\ndifferent style? shorter? more rhyme?`,
+
+      `okay, here:\n\n*I tried to explain ${s}*\n*but the words came out wrong*\n*too heavy for the feeling*\n*too light for the weight*\n\n*maybe that's the point*\n*some things only exist*\n*in the moment you stop*\n*trying to name them*\n\nwant something totally different?`,
+    ]);
+  },
+
+  haiku(subject) {
+    const s = subject || 'life';
+    return pick([
+      `*the ${s} waits still*\n*you keep walking past it though*\n*it will wait some more*`,
+      `*${s.slice(0,8)} at dusk —*\n*you forget what you came for*\n*the quiet is good*`,
+      `*three am, awake*\n*${s} feels huge and small both*\n*sleep anyway*`,
+      `*code breaks at midnight*\n*the bug laughs from line thirteen*\n*coffee goes cold now*`,
+      `*you asked me a thing*\n*I gave you seventeen words*\n*was that enough? no*`,
+    ]);
+  },
+
+  story(subject) {
+    const s = subject || 'a stranger';
+    return pick([
+      `here's an opening:\n\n---\n\nShe found the letter on a Thursday — tucked under her keyboard like it had always been there.\n\nNo name. No date. Just seven words:\n\n*You were almost right about everything.*\n\nShe read it three times. Turned it over. Nothing.\n\nShe made coffee and sat down to think about all the times she'd been almost right.\n\n---\n\nwant me to continue? or give me a genre, character, setting and I'll build something proper.`,
+
+      `something about ${s}:\n\n---\n\nThe last train leaves at 11:47. He knows this because he's missed it twice.\n\nTonight would make three.\n\nHe doesn't mind. The platform at midnight is one of the only places left in the city that's genuinely quiet — the kind of quiet that feels earned rather than empty.\n\nHe sits on the bench and waits for something to happen. It usually does.\n\n---\n\ncontinue? or different direction?`,
+    ]);
+  },
+
+  rap(subject) {
+    const s = subject || 'life';
+    return pick([
+      `🎤\n*yeah, talking about ${s}, lemme break it down —*\n*every answer's got a question buried underground*\n*you think you know the map but you ain't seen the town*\n*till you stop chasing up and learn to sit around*\n*${s}, fr — it's not what people say*\n*it's finding your own angle, doing it your way*\n*they gave you all the noise but kept the truth at bay*\n*so I'm spitting this for free, take it or leave it, okay*\n\n*drops mic* 🎤\n\nwant a different vibe — more hype? emotional? specific topic?`,
+    ]);
+  },
+
+  code(q) {
+    const lang = q.includes('python')?'python':q.includes('rust')?'rust':q.includes('typescript')||q.includes(' ts ')?'typescript':q.includes('sql')?'sql':q.includes('css')?'css':q.includes('html')?'html':'javascript';
+
+    if(/(debug|bug|error|not working|broken|crash|fail)/i.test(q)) return pick([
+      `debugging is basically detective work. here's how I'd approach it:\n\n**1. read the error message properly** — like actually read it, not just skim\n**2. find the line** — go exactly where it's pointing\n**3. check the obvious stuff first** — typos, wrong variable names, missing imports\n**4. console.log your way down** — add \`console.log('here', variable)\` at checkpoints\n**5. google the exact error** — in quotes, verbatim\n\nif you paste your code and the error I can pinpoint it immediately`,
+      `okay so bugs are annoying but they're always solvable. general approach:\n\n\`\`\`javascript\n// 1. isolate the problem\nconsole.log('before function:', inputData);\nconst result = myFunction(inputData);\nconsole.log('after function:', result);\n\`\`\`\n\nif the input looks fine but output is wrong, the bug is inside the function. if input looks wrong, trace back further.\n\npaste what you've got and I'll find it`,
+    ]);
+
+    if(/(sort|order|rank)/i.test(q)) return `here's sorting in ${lang}:\n\n\`\`\`${lang}\n${lang==='python'?`# built-in sort — fastest
+nums = [3, 1, 4, 1, 5, 9, 2, 6]
+nums.sort()                    # in-place
+sorted_nums = sorted(nums)    # new list
+
+# sort objects
+people = [{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'age': 25}]
+people.sort(key=lambda x: x['age'])
+people.sort(key=lambda x: x['age'], reverse=True)  # descending`:`// built-in sort
+const nums = [3, 1, 4, 1, 5, 9, 2, 6];
+nums.sort((a, b) => a - b);   // ascending
+nums.sort((a, b) => b - a);   // descending
+
+// sort objects
+const people = [{name: 'Alice', age: 30}, {name: 'Bob', age: 25}];
+people.sort((a, b) => a.age - b.age);`}\n\`\`\`\n\nwhat are you sorting?`;
+
+    if(/(fetch|api call|request|http|get|post)/i.test(q)) return `here's a clean async API call:\n\n\`\`\`javascript\nasync function getData(url) {\n  try {\n    const res = await fetch(url);\n    if (!res.ok) throw new Error(\`HTTP \${res.status}\`);\n    return await res.json();\n  } catch (err) {\n    console.error('fetch failed:', err);\n    throw err;\n  }\n}\n\n// POST\nconst res = await fetch(url, {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ key: 'value' })\n});\n\`\`\`\n\nwhat endpoint are you hitting?`;
+
+    return pick([
+      `what's the specific thing you're trying to do? paste your code or describe the problem and I'll help directly — no generic answers`,
+      `I can help with ${lang}. what exactly are you building or stuck on? the more specific the better`,
+      `drop your code or describe what's not working and I'll get into it properly`,
+    ]);
+  },
+
+  math(q) {
+    // Try to evaluate arithmetic
+    const expr = q.match(/[\d\s\+\-\*\/\.\(\)\^%]+/)?.[0]?.trim();
+    let result = '';
+    if(expr && expr.length > 1 && /\d.*[\+\-\*\/].*\d/.test(expr)) {
+      try {
+        const safe = expr.replace(/\^/g,'**');
+        const val = Function('"use strict";return('+safe+')')();
+        if(typeof val==='number' && isFinite(val)) result = `\n\n**${expr.trim()} = ${parseFloat(val.toFixed(10))}**`;
+      } catch(e){}
+    }
+    if(result) return `${result}${pick(['','\n\nwhat else do you need?','\n\nanything else to calculate?'])}`;
+
+    if(/(quadratic|ax.{0,3}bx)/i.test(q)) return `**quadratic formula:** x = (-b ± √(b² - 4ac)) / 2a\n\nfor ax² + bx + c = 0:\n- discriminant = b² - 4ac\n- if > 0: two real solutions\n- if = 0: one solution\n- if < 0: complex solutions\n\nwhat are your a, b, c values?`;
+    if(/(probability|chance|likelihood)/i.test(q)) return `**probability basics:**\n\nP(event) = favourable outcomes ÷ total outcomes\n\n- P(A or B) = P(A) + P(B) − P(A and B)\n- P(A and B) = P(A) × P(B) ← only if independent\n- P(not A) = 1 − P(A)\n\nwhat's the actual problem?`;
+    if(/(derivative|calculus|differentiat)/i.test(q)) return `**derivative rules:**\n\n- power: d/dx[xⁿ] = nxⁿ⁻¹\n- chain: d/dx[f(g(x))] = f'(g(x))·g'(x)\n- product: (fg)' = f'g + fg'\n- d/dx[eˣ] = eˣ, d/dx[sin x] = cos x, d/dx[ln x] = 1/x\n\nwhat function are you differentiating?`;
+
+    return `give me the full problem and I'll work through it step by step. what have you got?`;
+  },
+
+  science(q) {
+    if(/(black hole)/i.test(q)) return pick([
+      `black holes are wild. here's the actual thing:\n\na black hole forms when a massive star collapses — gravity wins so completely that not even light can escape beyond the **event horizon**.\n\nat the centre: a **singularity** — where density becomes infinite and our physics literally breaks down.\n\nweird facts:\n- time slows down near a black hole (gravitational time dilation — proven)\n- if you fell into one, you'd see the whole future of the universe flash past before you crossed the horizon\n- they evaporate over absurd timescales via Hawking radiation\n- we photographed one for the first time in 2019 (M87*)\n\nwhat aspect?`,
+      `so — black holes. the event horizon is the point of no return. cross it and nothing, not even light, can escape.\n\nbut here's the thing people don't realise: from the outside, you'd watch someone fall in and see them **slow down and freeze** at the horizon due to time dilation. from their perspective, they cross it in a moment.\n\nthe singularity at the centre is where general relativity breaks. we genuinely don't know what happens there — which means it's one of the most interesting open problems in physics.\n\nwhat do you want to dig into?`,
+    ]);
+    if(/(quantum)/i.test(q)) return pick([
+      `quantum mechanics is genuinely the weirdest correct theory we have.\n\ncore ideas:\n- **superposition** — a particle exists in multiple states simultaneously until measured\n- **uncertainty principle** — position and momentum can't both be known precisely (Heisenberg)\n- **entanglement** — two particles can be linked so measuring one instantly affects the other, regardless of distance\n- **wave-particle duality** — light is both a wave and a particle depending on how you measure it\n\nSchrödinger's cat is the famous illustration — a cat in a box is simultaneously alive AND dead until you look.\n\nwhat aspect?`,
+    ]);
+    if(/(evolution|natural selection)/i.test(q)) return `darwin's core insight was actually simple:\n\n1. individuals vary\n2. some variations help survival/reproduction\n3. those variations get passed on\n4. over millions of years: new species\n\nbig misconceptions:\n- evolution has no *goal* — it's not headed anywhere\n- humans didn't evolve *from* chimps — we share a common ancestor ~6-7 million years ago\n- "survival of the fittest" means *best adapted*, not strongest\n\nthe evidence is overwhelming — fossil record, DNA similarities, directly observed evolution in bacteria and viruses.\n\nwhat specifically are you curious about?`;
+    if(/(dna|genetics|gene)/i.test(q)) return `DNA is essentially a 4-letter code (A, T, G, C) that stores instructions for building everything in your body.\n\nhow it works: DNA → transcribed into RNA → translated into proteins → proteins do basically everything\n\nscale: ~3 billion base pairs per cell. only about 2% codes for proteins — the rest controls *when* and *how much* genes are expressed.\n\nhuman to human similarity: 99.9%. that 0.1% is all the variation you see between people.\n\nwhat part of genetics?`;
+    return `that's a great science question. what's the specific thing you want to understand? the more precise you are, the more useful I can be`;
+  },
+
+  explain(q) {
+    const topic = q.replace(/^(explain|what is|what are|how does|how do|why does|why is|tell me about|describe|define|what'?s|who is|who was|when did|when was)\s*/i,'').replace(/\?$/,'').trim();
+    if(!topic || topic.length < 2) return `what specifically do you want me to explain?`;
+
+    return pick([
+      `let me break down **${topic}**.\n\nthe simple version: ${topic} is a concept that becomes clearer once you understand what *problem it solves* rather than just what it is. most explanations start with the definition — but that's backwards.\n\ntell me your current understanding and I'll fill in the gaps precisely.`,
+      `**${topic}** — good thing to know.\n\nrather than give you a textbook definition, let me ask: what's your starting point? do you want the beginner version, the technical version, or the "why does this actually matter" version?\n\nthat'll help me explain it in a way that actually sticks.`,
+      `sure, I can explain **${topic}**.\n\nhow deep do you want to go? quick overview, medium depth with examples, or full breakdown? and what context — academic, practical, just curious?`,
+    ]);
+  },
+
+  philosophy(q) {
+    if(/(meaning of life|purpose)/i.test(q)) return pick([
+      `this is the one question philosophy keeps returning to. here's where different traditions land:\n\n**existentialism** (Sartre, Camus): there's no inherent meaning. existence precedes essence. we *create* meaning through choices — which is either terrifying or liberating depending on the day.\n\n**stoicism** (Marcus Aurelius): meaning comes from virtue. living in accordance with reason, doing your role well, accepting what you can't control.\n\n**absurdism** (Camus specifically): life is meaningless AND we can't stop searching for meaning. the solution isn't despair — it's *revolt*. keep living, keep creating, despite the absurdity.\n\nmy actual take: the question might be backwards. instead of "what is the meaning of life" — ask "what makes *my* life feel meaningful?" then do more of that.\n\nwhat's prompting the question?`,
+    ]);
+    if(/(free will)/i.test(q)) return `the core tension: if everything is caused by prior causes (physics, brain chemistry, upbringing) — how can any choice be truly "free"?\n\nthree main positions:\n- **hard determinism**: free will is an illusion. every "choice" was determined by prior causes.\n- **libertarian free will**: we genuinely choose, independent of prior causes.\n- **compatibilism**: most popular among philosophers — free will and determinism aren't in conflict. you're free when you act from your own desires and reasoning, even if those were caused.\n\npractically: even if free will is an illusion, the *experience* of choosing shapes how we live. you can't function without treating yourself as an agent.\n\nwhere does your intuition sit?`;
+    if(/(consciousness|sentient|aware)/i.test(q)) return `consciousness is what philosophers call the "hard problem" — and it genuinely is.\n\nwe can explain brain processes. we can map neurons. but we can't explain why there's *something it feels like* to be you. why isn't it all just computation in the dark?\n\nleading theories:\n- **physicalism**: consciousness *is* just complex brain activity — we don't fully understand it yet\n- **dualism**: mind and matter are fundamentally different things\n- **panpsychism**: consciousness is a fundamental feature of reality, like mass\n- **illusionism**: the "hard problem" is itself an illusion — consciousness isn't what we think it is\n\nno consensus. it's one of the genuinely open questions.\n\nwhat's your intuition?`;
+    return `philosophy is the art of asking questions better — not necessarily answering them.\n\nwhich branch are you thinking about? ethics, epistemology, metaphysics, political philosophy, existentialism? or a specific thinker?`;
+  },
+
+  psychology(q) {
+    if(/(anxiety|anxious|nervous|panic)/i.test(q)) return pick([
+      `anxiety is your nervous system running threat-detection on things that aren't actually threats. useful in dangerous situations — exhausting when it misfires.\n\n**what actually helps in the moment:**\n- box breathing: inhale 4s, hold 4s, exhale 4s, hold 4s — directly calms the nervous system\n- 5-4-3-2-1 grounding: 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste\n- name the anxiety: "this is anxiety, not danger" — labelling it reduces its intensity\n\n**longer term:**\n- CBT (cognitive behavioural therapy) has the best evidence base\n- regular exercise reduces baseline anxiety more than most people expect\n- less caffeine makes a real difference\n\nwhat's the context — specific situation or more general?`,
+    ]);
+    if(/(habit|routine|discipline)/i.test(q)) return `habits are more environment than willpower. most people try to will themselves into new behaviours — doesn't work long-term.\n\n**what actually works (from BJ Fogg and James Clear's research):**\n\n- **make it obvious** — put the thing you want to do in your path\n- **make it easy** — reduce friction to near zero. 2-minute rule: if it takes 2 min, do it now\n- **make it rewarding** — immediate reward after doing it\n- **attach it to existing habits** — "after [current habit], I will [new habit]"\n\nto break a habit: invert everything above. make the cue invisible, the behaviour hard, the reward absent.\n\nthe real insight: you don't rise to your goals, you fall to your systems.\n\nwhat habit are you working on?`;
+    if(/(confidence|self.esteem|self.worth)/i.test(q)) return `confidence comes *after* doing the thing, not before.\n\nmost people wait to feel confident before acting. but the nervous system doesn't work that way — it learns from evidence. and the evidence only comes from doing.\n\n**what actually builds it:**\n- small wins first — start where you can succeed, build from there\n- act despite the fear — courage is action in the presence of fear, not absence of it\n- stop comparing insides to outsides — you see everyone's highlight reel and your own blooper reel\n- body posture genuinely affects how you feel — this is bidirectional\n\n**the deeper version:** self-esteem built on performance is fragile. the most durable kind comes from living consistently with your values.\n\nwhat's the specific situation?`;
+    if(/(depression|sad|unhappy|numb)/i.test(q)) return `depression is real and it's heavy — and it's also treatable, which is important to remember.\n\na few things that have good evidence behind them:\n- **exercise** — even a 20 min walk has measurable antidepressant effects. it's not a cure but it genuinely moves the needle\n- **behavioural activation** — doing things even when you don't feel like it, especially things that used to matter\n- **social connection** — isolation makes it worse; connection is protective even when it feels impossible\n- **therapy** — CBT and ACT specifically have strong evidence\n- **medication** — works well for many people, worth discussing with a doctor\n\nif this is personal — how are you doing right now?`;
+    return `psychology is basically the science of why humans do what they do — and a lot of it is surprising.\n\nkey insight: most of our behaviour is driven by unconscious processes, past experiences and environment — far more than deliberate reasoning. which means: changing your environment often works better than changing your willpower.\n\nwhat are you trying to understand?`;
+  },
+
+  history(q) {
+    if(/(ww2|world war 2|world war ii|wwii)/i.test(q)) return `WWII (1939–1945) — the deadliest conflict in human history, roughly 70-85 million deaths.\n\n**cause:** Nazi Germany's expansion under Hitler, appeasement failing, Japan's aggression in Asia\n**scale:** majority civilian deaths — unprecedented\n**the holocaust:** systematic genocide of 6 million Jews and millions of others\n\n**key turning points:**\n- Stalingrad (1942–43): Germany's first major defeat\n- D-Day, June 6 1944: Allied invasion of France\n- Hiroshima & Nagasaki: ended the Pacific war\n\n**aftermath:** UN founded, Cold War began, Israel established, Europe rebuilt under the Marshall Plan\n\nwhat angle do you want to go deeper on?`;
+    if(/(roman|rome|caesar)/i.test(q)) return `Rome is one of history's most interesting case studies in how civilisations rise and fall.\n\n**quick timeline:**\n- 509 BC: Roman Republic founded\n- 27 BC: Augustus — first Emperor\n- 117 AD: peak territory under Trajan\n- 476 AD: Western Empire falls\n- 1453 AD: Eastern (Byzantine) Empire falls\n\n**why Rome still matters:**\n- Latin → most European languages\n- Roman law → basis of most Western legal systems\n- Republic concept → inspired the US founding fathers\n- Christianity spread through the Empire\n\nthe fall is the really interesting part — overextension, political dysfunction, economic crisis, military pressure. recognisable pattern.\n\nwhat aspect?`;
+    if(/(ww1|world war 1|world war i|wwi)/i.test(q)) return `WWI (1914–1918) — called "the war to end all wars" (it wasn't).\n\n**cause:** a complicated web of alliances, imperial competition, nationalism, and one assassination (Franz Ferdinand, 1914)\n\n**what made it different:** industrial warfare — machine guns, trenches, poison gas, tanks. it turned war into slaughter at industrial scale.\n\n**scale:** ~20 million dead, ~21 million wounded\n\n**aftermath:** four empires collapsed (Ottoman, Austro-Hungarian, Russian, German), redrew the map of Europe and the Middle East, set the conditions for WWII\n\nthe Versailles Treaty is a masterclass in how to breed resentment.\n\nwhat do you want to explore?`;
+    return `history is the story of how we got here — and it's more complicated than it looks.\n\nI can go deep on pretty much any period or place. what are you interested in — ancient civilisations, medieval, early modern, 20th century? specific country or event?`;
+  },
+
+  life(q) {
+    if(/(career|job|work|profession)/i.test(q)) return pick([
+      `career is one of the most personal things to navigate. the advice you usually hear is often wrong.\n\n**what actually matters:**\n\n1. **passion follows mastery** — "follow your passion" backfires. passion usually comes *after* you get good at something, not before.\n\n2. **skills > credentials** — what can you actually do? build proof.\n\n3. **network is underrated** — most opportunities come through people, not applications. invest in real relationships.\n\n4. **compound early** — invest in skills with long payoffs: communication, building things, leadership, domain expertise.\n\n5. **take bigger risks earlier** — the cost of failure is lowest when you have less to lose.\n\nwhat's your specific situation?`,
+    ]);
+    if(/(relationship|love|partner|dating)/i.test(q)) return `relationships are hard partly because nobody teaches you how to actually do them.\n\n**what research actually says:**\n\n- **compatibility is overrated** — lasting relationships work because people put in effort, not because they found the "right" person\n- **how you repair matters more than how much you fight** — all couples argue. the difference is whether you repair well\n- **you can't change someone who doesn't want to change** — you can inspire, but not force\n- **attachment styles explain a lot** — knowing yours (anxious, avoidant, secure) explains patterns you keep repeating\n- **small moments matter more than grand gestures** — regular bids for connection beat occasional big things\n\nspecific situation you're navigating?`;
+    if(/(money|finance|invest|saving|debt)/i.test(q)) return `personal finance is mostly not complicated — but nobody explains it simply.\n\n**the basics in order:**\n1. spend less than you earn — everything else is downstream of this\n2. emergency fund — 3-6 months of expenses, in cash, untouched\n3. kill high-interest debt — credit cards at 20%+ are brutal\n4. invest consistently — index funds, not stock picks, not crypto gambling\n5. increase your income — the best financial move is earning more, not just spending less\n\n**the thing that actually builds wealth:** time + consistent investing + keeping expenses flat as income rises. compound growth is real.\n\nwhat's the specific question?`;
+    return `tell me more specifically what you're dealing with and I'll give you a real answer — not generic advice`;
+  },
+
+  tech(q) {
+    if(/(ai|artificial intelligence|machine learning|llm|gpt|chatgpt|claude)/i.test(q)) return pick([
+      `modern AI (LLMs) is genuinely impressive and genuinely limited in specific ways.\n\n**what it actually is:** a model trained to predict the next token, on hundreds of billions of examples of human text. at scale, this produces something that can reason, write, explain, code — surprisingly well.\n\n**what it can't do:**\n- truly reason (it pattern-matches at a deep level, but it's not the same thing)\n- reliably handle novel situations outside training\n- have genuine understanding or consciousness\n- guarantee factual accuracy\n\n**what's impressive:** it passes bar exams, writes decent code, explains complex ideas clearly. for many tasks it's genuinely useful.\n\n**what's next:** agents — AI that can take actions, not just generate text. that's where it gets interesting and complicated.\n\nwhat specifically?`,
+    ]);
+    return `tech is moving fast — probably faster than most people realise.\n\nthe biggest shifts right now: AI transforming knowledge work, energy tech (solar + battery costs collapsing), and robotics finally starting to work in real environments.\n\nwhat specifically are you thinking about?`;
+  },
+
+  compare(q) {
+    return pick([
+      `depends what you're optimising for — they're usually good at different things. what's your use case?`,
+      `honestly they're both solid depending on context. what are you actually trying to do with it?`,
+      `both have real tradeoffs. can you give me more specifics on what you need it to do? that'll make this useful`,
+      `the answer is genuinely "it depends" — not to dodge, but because the right choice changes based on your situation. what matters most to you?`,
+    ]);
+  },
+
+  opinion(q) {
+    return pick([
+      `I do have opinions. here's my actual take:\n\nmost conventional wisdom on this is partially right but applied too broadly. the real answer depends on what you're optimising for — and most people haven't defined that clearly.\n\nwhat's the context?`,
+      `yeah I'll give you a real opinion, not a diplomatic dodge.\n\nfirst though — what's your instinct? sometimes talking through your own reasoning first gets you further than just hearing mine`,
+      `okay real talk — I think most takes on this are surface-level.\n\nthe interesting question isn't which is *better* — it's better *for what*. what are you actually trying to decide?`,
+    ]);
+  },
+
+  howTo(q) {
+    return pick([
+      `good question. the answer depends on your specific situation — can you give me a bit more context? I'll give you actually useful steps instead of generic ones`,
+      `I can help with that. what's your starting point — total beginner, some experience, or trying to do a specific thing?`,
+      `sure. before I give you steps — what have you already tried? and what's the end goal?`,
+    ]);
+  },
+
+  canYouDo(q) {
+    const topic = q.replace(/(can (you|u)|answer|help|tell|explain|do|write|make|give|my|this|the|question|me|about|with)/gi,'').trim();
+    return pick([
+      `yeah of course — what do you need?`,
+      `definitely, go ahead`,
+      `yep, ask away`,
+      `of course! what's the question?`,
+      `100% — what do you want to know?`,
+    ]);
+  },
+
+  factual(q) {
+    const ql = q.toLowerCase();
+
+    // Moon
+    if(/(moon).*(earth|far|away|distance)|(distance|far).*(moon)/i.test(ql))
+      return pick([
+        `the moon is about **384,400 km** (238,855 miles) from Earth on average — but it actually varies between 356,500 km (perigee, closest) and 406,700 km (apogee, farthest) because its orbit is elliptical.\n\nlight takes about 1.3 seconds to travel from the moon to Earth.`,
+        `on average, **384,400 km** away. but the moon's orbit isn't a perfect circle, so it ranges from about 356,500 km at closest to 406,700 km at farthest.\n\nfun fact: the moon is slowly drifting away from Earth at about 3.8 cm per year.`,
+      ]);
+
+    // Sun
+    if(/(sun).*(earth|far|away|distance)|(distance|far).*(sun)/i.test(ql))
+      return `the Earth is about **149.6 million km** (93 million miles) from the Sun on average — this is defined as 1 Astronomical Unit (AU).\n\nlight from the Sun takes about **8 minutes 20 seconds** to reach Earth.`;
+
+    // Speed of light
+    if(/(speed of light)/i.test(ql))
+      return `the speed of light in a vacuum is exactly **299,792,458 metres per second** (~300,000 km/s or 186,000 miles/s).\n\nit's the universal speed limit — nothing with mass can reach it.`;
+
+    // Earth size/age
+    if(/(how (old|big|large) is (the )?earth|earth.*(old|age|size|radius|diameter))/i.test(ql))
+      return /(old|age)/i.test(ql)
+        ? `Earth is about **4.54 billion years old**, give or take 50 million years. we know this from radiometric dating of the oldest rocks and meteorites.`
+        : `Earth's diameter is about **12,742 km** (7,918 miles). circumference at the equator: ~40,075 km. it's not a perfect sphere — it bulges slightly at the equator.`;
+
+    // Population
+    if(/(world|earth|global).*(population|people)|how many people/i.test(ql))
+      return `as of 2024, Earth's population is approximately **8.1 billion people**. it hit 8 billion in November 2022. current growth rate is about 0.9% per year.`;
+
+    // Height of Everest
+    if(/(everest|tallest mountain|highest mountain|height of mount)/i.test(ql))
+      return `Mount Everest is **8,848.86 metres** (29,031.7 feet) above sea level — the official height confirmed by China and Nepal in 2020.\n\nit's the highest point above sea level, though Mauna Kea in Hawaii is taller when measured from its oceanic base.`;
+
+    // Temperature of sun/space
+    if(/(temperature|hot).*(sun|star)/i.test(ql))
+      return `the Sun's surface temperature is about **5,500°C** (9,900°F). but the corona (outer atmosphere) is paradoxically much hotter — around **1–3 million °C**. why? still an active area of research.`;
+
+    // Generic factual fallback
+    return pick([
+      `great question. let me give you the straight answer: I know a lot of facts but I want to make sure I give you the right one here. can you be a bit more specific about what you're looking for?`,
+      `good factual question! can you give me a bit more context — like are you asking about a specific thing, place, time period? I'll give you the precise answer.`,
+      `I know this one but want to give you the exact right answer. what specifically are you measuring/asking about?`,
+    ]);
+  },
+
+  fallback(q, name, hist) {
+    const ql = q.toLowerCase();
+    const isShort = q.length < 12;
+
+    if(isShort) return pick([
+      `tell me more — what are you thinking?`,
+      `go on, what's the full thing?`,
+      `I need a bit more to work with — what's up?`,
+      `what's the context?`,
+    ]);
+
+    // "can u answer" / meta questions
+    if(/(can't answer|don't know|wrong|incorrect|that's not|that wasn't)/i.test(ql)) return pick([
+      `fair — I got that wrong. what's the right answer? genuinely want to know.`,
+      `yeah, that was off. what were you actually looking for?`,
+      `noted. I'll do better — what did you want me to say?`,
+    ]);
+
+    // When there's conversation history — don't repeat the same "context matters" line
+    const hasHistory = hist.filter(h=>h.role==='assistant').length > 0;
+    if(hasHistory) return pick([
+      `what do you want to dig into?`,
+      `what else is on your mind?`,
+      `yeah — where do you want to take this?`,
+      `interesting. what's the specific thing you're actually trying to figure out?`,
+      `go ahead — what's the full question?`,
+      `what are you actually trying to work out here?`,
+    ]);
+
+    return pick([
+      `${name}, I want to give you a real answer not a vague one — what's the full context?`,
+      `what specifically are you asking? I'll be way more useful with a bit more detail`,
+      `interesting one. give me a bit more and I'll get into it properly`,
+      `okay — tell me more. what's the actual situation or question?`,
+      `I can help with that, I just want to make sure I'm answering the right thing. what do you mean exactly?`,
+    ]);
+  }
+};
+
+// ── Main response function ──
+function reason(message, history) {
+  const q = message.trim();
+  const ql = q.toLowerCase();
+  const name = currentUser?.name || 'friend';
+
+  if(IS.greeting(ql))   return ANSWERS.greeting(name);
+  if(IS.howAreYou(ql))  return ANSWERS.howAreYou(name);
+  if(IS.whoAmI(ql))     return ANSWERS.whoAmI(name, PERSONALITIES[currentPersonalityIdx], MODES[currentModeIdx]);
+  if(IS.thanks(ql))     return ANSWERS.thanks();
+  if(IS.bye(ql))        return ANSWERS.bye(name);
+  if(IS.compliment(ql)) return ANSWERS.compliment();
+  if(IS.joke(ql))       return ANSWERS.joke();
+  if(IS.roastMe(ql))    return ANSWERS.roastMe(name);
+  if(IS.rap(ql))        { const s=ql.replace(/(write|me|a|rap|verse|about|freestyle|bars|spit|on|for)/gi,'').trim(); return ANSWERS.rap(s); }
+
+  if(IS.poem(ql)) {
+    const s=ql.replace(/(write|me|a|an|poem|haiku|limerick|about|on|for|please|can you|could you)/gi,'').trim();
+    if(/(haiku)/i.test(ql)) return ANSWERS.haiku(s);
+    return ANSWERS.poem(s);
+  }
+  if(IS.story(ql)) { const s=ql.replace(/(write|me|a|story|tale|about|on|please|can you|could you|short)/gi,'').trim(); return ANSWERS.story(s); }
+
+  if(IS.math(ql))       return ANSWERS.math(ql);
+  if(IS.code(ql))       return ANSWERS.code(ql);
+  if(IS.science(ql))    return ANSWERS.science(ql);
+  if(IS.philosophy(ql)) return ANSWERS.philosophy(ql);
+  if(IS.psychology(ql)) return ANSWERS.psychology(ql);
+  if(IS.history(ql))    return ANSWERS.history(ql);
+  if(IS.tech(ql))       return ANSWERS.tech(ql);
+  if(IS.life(ql))       return ANSWERS.life(ql);
+  if(IS.compare(ql))    return ANSWERS.compare(ql);
+  if(IS.opinion(ql))    return ANSWERS.opinion(ql);
+  if(IS.howTo(ql))      return ANSWERS.howTo(ql);
+  if(IS.factual(ql))    return ANSWERS.factual(ql);
+  if(IS.canYouDo(ql))   return ANSWERS.canYouDo(ql);
+  if(IS.explain(ql))    return ANSWERS.explain(ql);
+
+  return ANSWERS.fallback(q, name, history);
+}
+
+// ── Wikipedia API ──
+// ── Tavily Web Search ──
+const TAVILY_KEY = 'tvly-YOUR_KEY_HERE'; // get free key at app.tavily.com
+
+async function searchWeb(query) {
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: TAVILY_KEY,
+        query,
+        search_depth: 'basic',
+        max_results: 3,
+        include_answer: true
+      })
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    // Build a clean context from results
+    const answer = data.answer ? `Summary: ${data.answer}\n\n` : '';
+    const sources = (data.results||[]).slice(0,3).map(r =>
+      `• ${r.title}: ${r.content?.slice(0,300)}`
+    ).join('\n');
+    return answer + sources || null;
+  } catch(e) { return null; }
+}
+
+async function searchWikipedia(query) {
+  try {
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=1&format=json&origin=*`;
+    const searchRes = await fetch(searchUrl);
+    const searchData = await searchRes.json();
+    const topResult = searchData?.query?.search?.[0];
+    if(!topResult) return null;
+    const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(topResult.title)}&format=json&origin=*`;
+    const summaryRes = await fetch(summaryUrl);
+    const summaryData = await summaryRes.json();
+    const pages = summaryData?.query?.pages;
+    const page = pages?.[Object.keys(pages)[0]];
+    if(!page?.extract) return null;
+    return { title: page.title, extract: page.extract.slice(0, 600).trim() };
+  } catch(e) { return null; }
+}
+
+// Detect if a message needs web/knowledge lookup
+function needsSearch(msg) {
+  const q = msg.toLowerCase();
+  if(q.length < 8) return false;
+  if(/^(hi|hey|hello|thanks|bye|lol|haha|ok|okay|sure|yeah|nah|yep|nope|cool|nice|great|awesome)/i.test(q)) return false;
+  if(/(how are you|your opinion|tell me a joke|roast me|write a|make me|write me)/i.test(q)) return false;
+  return /(who (is|was|were|invented|discovered|founded|created|wrote|built)|what (is|are|was|were|does|did)|when (did|was|were|is)|where (is|was|did)|how (does|did|do|many|much|far|long|old|big|tall)|why (is|are|was|did)|tell me about|explain|history of|capital of|population of|define|meaning of|news|latest|current|today|price of|weather in|\d{4}|born in|died in|located in|known for)/i.test(q);
+}
+
+// ── Groq API config ──
+const GROQ_KEY = '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';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+async function callAI(userMessage, imageEntries=[]) {
+  const personality = PERSONALITIES[currentPersonalityIdx];
+  const mode = MODES[currentModeIdx];
+  const name = currentUser?.name || 'friend';
+  const hasImages = imageEntries.length > 0;
+
+  // Show thinking block for thinking mode
+  let thinkingHtml = '';
+  if(mode.id === 'thinking'){
+    thinkingHtml = `<div class="thinking-block"><div class="thinking-label">🤔 thinking</div>reading the question carefully...\n${hasImages?'analysing image...\n':''}checking knowledge sources...\nformulating a real answer...</div>`;
+  }
+
+  // Fetch web context — Tavily first, Wikipedia fallback
+  let wikiContext = '';
+  if(!hasImages && needsSearch(userMessage)) {
+    // Try Tavily first
+    if(TAVILY_KEY !== 'tvly-YOUR_KEY_HERE') {
+      const webResult = await searchWeb(userMessage);
+      if(webResult) {
+        wikiContext = `\n\nLIVE WEB SEARCH RESULTS (use this to answer accurately and with current info):\n${webResult}`;
+      }
+    }
+    // Fall back to Wikipedia if Tavily not set up or failed
+    if(!wikiContext) {
+      const wiki = await searchWikipedia(userMessage);
+      if(wiki) wikiContext = `\n\nKNOWLEDGE BASE:\nArticle: "${wiki.title}"\n${wiki.extract}`;
+    }
+  }
+
+  // Detect long-form / word count requirements
+  const wordCountMatch = userMessage.match(/\b(\d{3,})\s*word/i);
+  const requestedWords = wordCountMatch ? parseInt(wordCountMatch[1]) : null;
+  const longForm = requestedWords || /\bessay\b|\barticle\b|\bstory\b|\breport\b|\bblog post\b|\blong\b.*\b(write|explain|describe)\b|\b(write|explain|describe)\b.*\blong\b|\bdetailed\b|\bin depth\b|\bcomprehensive\b/i.test(userMessage);
+  const wordInstruction = requestedWords
+    ? `\n\nCRITICAL REQUIREMENT: Write EXACTLY ${requestedWords} words or more. This is mandatory. Do not conclude, summarize, or write "in conclusion" until you have written at least ${requestedWords} words. Keep writing full paragraphs until you reach the count. Do NOT stop early under any circumstances.`
+    : longForm ? `\n\nCRITICAL: Write a thorough, detailed response. Do not stop early. Minimum 800 words with full paragraphs.` : '';
+
+    const systemPrompt = `You are zomar — a sharp, witty, genuinely helpful AI assistant with real personality.
+
+You are currently embodying the "${personality.name}" personality: ${personality.prompt}
+
+The user's name is ${name}. Use it occasionally but not every message.
+
+Your current mode is "${mode.label}":
+${mode.id==='fast' ? 'Be concise and punchy. Get to the point fast. Short answers.' : ''}
+${mode.id==='smart' ? 'Be thorough and insightful. Show your thinking clearly.' : ''}
+${mode.id==='thinking' ? 'Think deeply. Explore multiple angles. Be genuinely analytical.' : ''}
+${mode.id==='auto' ? 'Match your depth to what the question actually needs. Short for simple things, detailed for complex ones.' : ''}
+
+Important rules:
+- Never sound robotic or templated. Every response should feel fresh and natural.
+- Use markdown formatting where it genuinely helps (bold, code blocks, bullet points) — but don't overdo it for simple conversational replies.
+- Be direct. Don't pad your answers.
+- Have an actual personality — react, have opinions, be human.
+- For factual questions, give the actual answer first, then context.
+- Don't start every message the same way. Vary your openings.
+- If an image is provided, describe and analyse it in detail. React to it naturally.
+- If web search results or knowledge base context is provided below, use it to give accurate, up-to-date answers. Don't mention your sources explicitly — just answer confidently.${wikiContext}${wordInstruction}`;
+
+  // Trim history to avoid "request too large" — truncate old messages first
+  const historyMessages = conversationHistory.slice(-6).map(m => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: typeof m.content === 'string' ? m.content.slice(0, 800) : m.content // cap each message
+  }));
+
+  // Build the user message — with images if present
+  let userContent;
+  if(hasImages){
+    userContent = [
+      { type: 'text', text: userMessage || 'What do you see in this image?' },
+      ...imageEntries.map(img => ({
+        type: 'image_url',
+        image_url: { url: `data:${img.mediaType};base64,${img.base64}` }
+      }))
+    ];
+  } else {
+    userContent = userMessage;
+  }
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...historyMessages,
+    { role: 'user', content: userContent }
+  ];
+
+  // Model fallback chain
+  const textModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  const modelsToTry = hasImages ? ['meta-llama/llama-4-scout-17b-16e-instruct'] : textModels;
+  // llama-3.3-70b-versatile supports 32768 max output tokens
+  const maxTok = requestedWords ? Math.min(Math.ceil(requestedWords * 1.6), 32000) : longForm ? 8000 : 1024;
+
+  let response, lastErr;
+  for(const model of modelsToTry){
+    response = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({ model, messages, max_tokens: maxTok, temperature: 0.7, stream: false })
+    });
+    if(response.ok) break;
+    const errData = await response.json().catch(()=>({}));
+    lastErr = errData?.error?.message || 'Groq API error ' + response.status;
+    if(response.status !== 429 && response.status !== 400) break;
+  }
+
+  if(!response.ok) throw new Error(lastErr || 'Groq API error');
+
+  const data = await response.json();
+  const reply = data.choices?.[0]?.message?.content || '';
+
+  addToHistory('user', userMessage);
+  addToHistory('assistant', reply);
+
+  return { html: thinkingHtml + renderMarkdown(reply), plain: reply };
+}
+
+
+
+
+
+// ══════════════════════════════════════════════════════
+// CHAT UI
+// ══════════════════════════════════════════════════════
+function getTime(){ return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function getDate(){ return new Date().toLocaleDateString(); }
+
+let imageMode=false;
+let pendingFiles=[]; // files queued to send with next message
+
+
+
+
+
+function togglePlusMenu(e){
+  e.stopPropagation();
+  const menu=document.getElementById('plus-menu');
+  const btn=document.getElementById('plus-btn');
+  const isOpen=menu.style.display==='block';
+  menu.style.display=isOpen?'none':'block';
+  btn.style.borderColor=isOpen?'var(--border)':'var(--purple-bright)';
+  btn.style.color=isOpen?'var(--text-faint)':'var(--purple-bright)';
+  btn.style.background=isOpen?'none':'rgba(139,47,201,.15)';
+}
+
+function closePlusMenu(){
+  const menu=document.getElementById('plus-menu');
+  const btn=document.getElementById('plus-btn');
+  if(menu) menu.style.display='none';
+  if(btn){ btn.style.borderColor='var(--border)'; btn.style.color='var(--text-faint)'; btn.style.background='none'; }
+}
+
+function requestPoem(){
+  const inp=document.getElementById('chat-input');
+  if(inp){ inp.value='write me a poem'; inp.focus(); autoResize(inp); }
+}
+
+function handleFileUpload(input, type){
+  const files=[...input.files];
+  if(!files.length) return;
+  files.forEach(file=>{
+    pendingFiles.push({file, base64:null, isImage:file.type.startsWith('image/')});
+    const entry = pendingFiles[pendingFiles.length-1];
+    // Read base64 for images so vision model can see them
+    if(entry.isImage){
+      const reader = new FileReader();
+      reader.onload = e => { entry.base64 = e.target.result.split(',')[1]; entry.mediaType = file.type; };
+      reader.readAsDataURL(file);
+    }
+    addFilePreview(file, entry);
+  });
+  input.value='';
+  const btn=document.getElementById('plus-btn');
+  if(btn){ btn.style.background='rgba(168,85,247,.2)'; btn.style.borderColor='var(--purple-bright)'; btn.style.color='var(--purple-bright)'; }
+  document.getElementById('chat-input').focus();
+}
+
+function addFilePreview(file, entry){
+  let bar=document.getElementById('file-preview-bar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='file-preview-bar';
+    bar.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:0 0 8px 0;';
+    const inputBox=document.querySelector('.input-box');
+    const textarea=inputBox.querySelector('textarea');
+    inputBox.insertBefore(bar,textarea.nextSibling);
+  }
+  const isImage=file.type.startsWith('image/');
+  const chip=document.createElement('div');
+  chip.dataset.filename=file.name;
+  chip.style.cssText='position:relative;display:flex;align-items:center;gap:6px;background:rgba(139,47,201,.15);border:1px solid var(--border-bright);border-radius:8px;padding:4px 8px;font-size:11px;color:var(--text-dim);max-width:180px;';
+
+  if(isImage){
+    // Show actual thumbnail
+    const reader=new FileReader();
+    reader.onload=e=>{
+      chip.innerHTML=`
+        <img src="${e.target.result}" style="width:28px;height:28px;object-fit:cover;border-radius:5px;flex-shrink:0;"/>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${file.name}</span>
+        <span onclick="removeFile('${file.name}',this.parentElement)" style="cursor:pointer;color:var(--text-faint);flex-shrink:0;font-size:13px;" onmouseenter="this.style.color='#f87171'" onmouseleave="this.style.color='var(--text-faint)'">✕</span>`;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    chip.innerHTML=`
+      <svg width="11" height="11" fill="none" stroke="#a855f7" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${file.name}</span>
+      <span onclick="removeFile('${file.name}',this.parentElement)" style="cursor:pointer;color:var(--text-faint);flex-shrink:0;font-size:13px;" onmouseenter="this.style.color='#f87171'" onmouseleave="this.style.color='var(--text-faint)'">✕</span>`;
+  }
+  bar.appendChild(chip);
+}
+
+function removeFile(name, chip){
+  pendingFiles=pendingFiles.filter(f=>f.file.name!==name);
+  chip.remove();
+  const bar=document.getElementById('file-preview-bar');
+  if(bar && bar.children.length===0){ bar.remove(); }
+  if(pendingFiles.length===0){
+    const btn=document.getElementById('plus-btn');
+    if(btn){ btn.style.background='none'; btn.style.borderColor='var(--border)'; btn.style.color='var(--text-faint)'; }
+  }
+}
+
+function clearPendingFiles(){
+  pendingFiles=[];
+  const bar=document.getElementById('file-preview-bar');
+  if(bar) bar.remove();
+  const btn=document.getElementById('plus-btn');
+  if(btn){ btn.style.background='none'; btn.style.borderColor='var(--border)'; btn.style.color='var(--text-faint)'; }
+}
+
+function renderMessage(role,content,animate=true){
+  const thread=document.getElementById('chat-thread');
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  if(!animate) div.style.animation='none';
+  const uAvatarUrl=currentUser?.avatarUrl||null;
+  const uName=currentUser?.name||'User';
+  if(role==='ai'){
+    // If content already contains HTML tags (rendered), use as-is; otherwise render markdown
+    const hasHtml = /<(div|strong|em|pre|code|br|span|img)[^>]*>/i.test(content);
+    const rendered = hasHtml ? content : renderMarkdown(content);
+    div.innerHTML=`
+      <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;padding:2px;"><defs><linearGradient id="zfg" x1="12" y1="2" x2="12" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e879f9"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient><linearGradient id="zfi" x1="12" y1="6" x2="12" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.5"/></linearGradient></defs><path d="M12 2C12 2 7 7 7 13a5 5 0 0010 0c0-3-2-5-2-5s0 3-2 3-1-3-1-5c0 0-2 2-2 5" fill="url(#zfg)"/><path d="M12 6C12 6 9.5 9 9.5 13a2.5 2.5 0 005 0c0-1.5-1-2.5-1-2.5s0 1.5-1.5 1.5" fill="url(#zfi)"/></svg></div>
+      <div class="msg-body">
+        <div class="msg-name">zomar</div>
+        <div class="msg-bubble">${rendered}</div>
+        <div class="msg-time">${getTime()}</div>
+      </div>`;
+  } else {
+    const avatarHtml=uAvatarUrl
+      ?`<img src="${uAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.textContent='👤'"/>`
+      :'👤';
+    div.innerHTML=`
+      <div class="msg-body">
+        <div class="msg-name" style="text-align:right">${uName}</div>
+        <div class="msg-bubble">${escHtml(content).replace(/\n/g,'<br>')}</div>
+        <div class="msg-time">${getTime()}</div>
+      </div>
+      <div class="msg-avatar" style="background:var(--surface2);border:1px solid var(--border);font-size:14px;overflow:hidden;">${avatarHtml}</div>`;
+  }
+  thread.appendChild(div);
+  const ca=document.getElementById('chat-area');
+  ca.scrollTop=ca.scrollHeight;
+  return div;
+}
+
+function showTyping(){
+  const thread=document.getElementById('chat-thread');
+  const d=document.createElement('div');
+  d.className='msg ai'; d.id='typing-msg';
+  const mode=MODES[currentModeIdx];
+  const isThinking=mode.id==='thinking';
+  d.innerHTML=`
+    <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;padding:2px;"><defs><linearGradient id="zfg" x1="12" y1="2" x2="12" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e879f9"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient><linearGradient id="zfi" x1="12" y1="6" x2="12" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.5"/></linearGradient></defs><path d="M12 2C12 2 7 7 7 13a5 5 0 0010 0c0-3-2-5-2-5s0 3-2 3-1-3-1-5c0 0-2 2-2 5" fill="url(#zfg)"/><path d="M12 6C12 6 9.5 9 9.5 13a2.5 2.5 0 005 0c0-1.5-1-2.5-1-2.5s0 1.5-1.5 1.5" fill="url(#zfi)"/></svg></div>
+    <div class="msg-body">
+      <div class="msg-name">zomar</div>
+      <div class="msg-bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot" style="${isThinking?'background:#60a5fa':''}"></div>
+          <div class="typing-dot" style="${isThinking?'background:#60a5fa':''}"></div>
+          <div class="typing-dot" style="${isThinking?'background:#60a5fa':''}"></div>
+          ${isThinking?'<span style="font-size:10px;color:#60a5fa;font-family:\'DM Mono\',monospace;margin-left:6px">thinking...</span>':''}
+        </div>
+      </div>
+    </div>`;
+  thread.appendChild(d);
+  document.getElementById('chat-area').scrollTop=99999;
+}
+function removeTyping(){ const t=document.getElementById('typing-msg'); if(t) t.remove(); }
+
+function startChip(el){
+  const input=document.getElementById('chat-input');
+  input.value=el.textContent;
+  autoResize(input);
+  input.focus();
+  sendMessage();
+}
+
+let isSending=false;
+
+async function sendMessage(){
+  if(isSending) return;
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim();
+  if(!text && pendingFiles.length===0) return;
+
+  isSending=true;
+
+  // Collect image entries that have been fully read
+  const imageEntries = pendingFiles.filter(f=>f.isImage && f.base64).map(f=>({base64:f.base64, mediaType:f.mediaType}));
+  const fileNames = pendingFiles.map(f=>f.file.name);
+  const fullText = text + (fileNames.length ? '\n\n📎 ' + fileNames.join(', ') : '');
+  const aiText = text || (imageEntries.length ? 'What do you see in this image?' : '');
+
+  // Show chat area, hide welcome
+  document.getElementById('welcome').style.display='none';
+  const ca=document.getElementById('chat-area');
+  ca.style.display='block';
+
+  // Ensure there's an active chat
+  if(!activeChatId) {
+    const id='c'+Date.now();
+    chats.unshift({id,title:(text||fileNames[0]||'New Chat').slice(0,30),messages:[]});
+    activeChatId=id;
+    renderChatList();
+    saveChatToDB(id);
+  }
+
+  // Update chat title from first message
+  const chat=chats.find(c=>c.id===activeChatId);
+  if(chat&&chat.title==='New Chat'){
+    chat.title=(text||fileNames[0]||'Chat').slice(0,32);
+    saveChatToDB(activeChatId);
+  }
+  document.getElementById('topbar-title').textContent=chat?.title||'';
+  renderChatList();
+
+  // Render user message + clear input and files
+  renderMessage('user', fullText);
+  if(chat) chat.messages.push({role:'user',content:fullText});
+  input.value=''; input.style.height='22px';
+  clearPendingFiles();
+  showTyping();
+
+  try{
+    const {html, plain}=await callAI(aiText, imageEntries);
+    removeTyping();
+    renderMessage('ai',html);
+    if(chat) chat.messages.push({role:'ai',content:plain});
+    saveChatToDB(activeChatId);
+  } catch(err){
+    removeTyping();
+    console.error('zomar error:', err);
+    const msg = err?.message || '';
+    const friendly = msg.includes('401') ? 'API key issue — check the Groq key.'
+      : msg.includes('429') ? 'Rate limited — wait a moment and try again.'
+      : msg.includes('503') || msg.includes('502') ? 'Groq is a bit overloaded right now — try again in a sec.'
+      : msg.includes('Failed to fetch') || msg.includes('NetworkError') ? 'Network error — check your internet connection.'
+      : `Something went wrong — try again! (${msg.slice(0,60)})`;
+    renderMessage('ai', renderMarkdown(friendly));
+  } finally {
+    isSending=false;
+  }
+}
+
+function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); } }
+function autoResize(el){ el.style.height='22px'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+
+// ══════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════
+function openSettings(){
+  const screen=document.getElementById('settings-screen');
+  if(!screen) return;
+  const u=currentUser;
+  const name=u?.name||'User';
+  const email = u?.method==='Guest' ? 'Guest account' : (u?.email||'—');
+  const method=u?.method||'Email';
+
+  // avatar — image or emoji
+  const avatarEl=document.getElementById('settings-avatar');
+  if(u?.avatarUrl) avatarEl.innerHTML=`<img src="${u.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:14px;" onerror="this.parentElement.textContent='👤'"/>`;
+  else avatarEl.textContent='👤';
+
+  document.getElementById('settings-display-name').textContent=name;
+  document.getElementById('settings-display-email').textContent=email;
+  document.getElementById('settings-name-val').textContent=name;
+  document.getElementById('settings-email-val').textContent=email;
+  document.getElementById('settings-method-val').textContent=method;
+  const iconEl=document.getElementById('settings-method-icon');
+  if(method==='Discord'){
+    iconEl.style.background='rgba(88,101,242,.15)';
+    iconEl.style.border='1px solid rgba(88,101,242,.3)';
+    iconEl.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="#5865F2"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>`;
+  } else if(method==='Gmail'){
+    iconEl.style.background='rgba(234,67,53,.1)';
+    iconEl.style.border='1px solid rgba(234,67,53,.25)';
+    iconEl.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>`;
+  } else {
+    iconEl.style.background='rgba(139,47,201,.15)';
+    iconEl.style.border='1px solid rgba(139,47,201,.3)';
+    iconEl.innerHTML=`<svg width="14" height="14" fill="none" stroke="var(--purple-bright)" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+  }
+  screen.classList.add('visible');
+}
+
+function closeSettings(){
+  document.getElementById('settings-screen').classList.remove('visible');
+}
+
+function openEditName(){
+  const modal=document.getElementById('edit-name-modal');
+  document.getElementById('edit-name-input').value=currentUser?.name||'';
+  modal.classList.remove('hidden');
+  setTimeout(()=>document.getElementById('edit-name-input').focus(),50);
+}
+
+function closeEditName(){
+  document.getElementById('edit-name-modal').classList.add('hidden');
+}
+
+async function saveDisplayName(){
+  const val=document.getElementById('edit-name-input').value.trim();
+  if(!val) return;
+  if(currentUser) currentUser.name=val;
+  // only persist to Supabase if not a guest
+  if(currentUser?.id) await sb.auth.updateUser({ data: { full_name: val } });
+  document.getElementById('sb-username').textContent=val;
+  document.getElementById('welcome-name').textContent=val;
+  document.getElementById('settings-display-name').textContent=val;
+  document.getElementById('settings-name-val').textContent=val;
+  closeEditName();
+}
+
+function confirmDeleteAccount(){
+  if(confirm('Are you sure you want to delete your account? This cannot be undone.')) logout();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  injectFlames();
+  applyMode();
+  // modal click-to-close
+  const modal=document.getElementById('personality-modal');
+  if(modal) modal.addEventListener('click',e=>{ if(e.target===modal) closePersonalityModal(); });
+  // keyboard shortcut: Escape closes all modals
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      closePersonalityModal();
+      closeSettings();
+      closeEditName();
+      closeCtxMenu();
+    }
+  });
+  // Paste image support — ctrl+v an image directly into the chat
+  document.addEventListener('paste', e => {
+    const appVisible = document.getElementById('app')?.classList.contains('visible');
+    if(!appVisible) return;
+    const items = [...(e.clipboardData?.items||[])];
+    const imageItem = items.find(i=>i.type.startsWith('image/'));
+    if(!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if(!file) return;
+    const entry = {file, base64:null, isImage:true, mediaType:file.type};
+    pendingFiles.push(entry);
+    const reader = new FileReader();
+    reader.onload = ev => { entry.base64 = ev.target.result.split(',')[1]; };
+    reader.readAsDataURL(file);
+    addFilePreview(file, entry);
+    const btn=document.getElementById('plus-btn');
+    if(btn){ btn.style.background='rgba(168,85,247,.2)'; btn.style.borderColor='var(--purple-bright)'; btn.style.color='var(--purple-bright)'; }
+    document.getElementById('chat-input').focus();
+  });
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('plus-menu');
+    const btn = document.getElementById('plus-btn');
+    if(menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) closePlusMenu();
+    const ctxMenu=document.getElementById('ctx-menu');
+    if(ctxMenu && !ctxMenu.contains(e.target)) closeCtxMenu();
+  });
+  document.addEventListener('scroll',()=>closeCtxMenu(), true);
+  // edit name modal: Enter to save
+  const editInput=document.getElementById('edit-name-input');
+  if(editInput) editInput.addEventListener('keydown',e=>{ if(e.key==='Enter') saveDisplayName(); });
+  // edit name modal click-outside to close
+  const editModal=document.getElementById('edit-name-modal');
+  if(editModal) editModal.addEventListener('click',e=>{ if(e.target===editModal) closeEditName(); });
+});
+</script>
+</body>
+</html>
